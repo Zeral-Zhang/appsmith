@@ -13,20 +13,20 @@ import {
   ReduxActionTypes,
   ReduxSagaChannels,
 } from "constants/ReduxActionConstants";
-import { ANONYMOUS_USERNAME } from "constants/userConstants";
 import {
   WEBSOCKET_EVENTS,
   websocketDisconnectedEvent,
   websocketConnectedEvent,
 } from "constants/WebsocketConstants";
 
-import { commentEvent } from "actions/commentActions";
 import {
   setIsWebsocketConnected,
   retrySocketConnection,
 } from "actions/websocketActions";
 
-import { areCommentsEnabledForUser } from "selectors/commentsSelectors";
+import { areCommentsEnabledForUserAndApp } from "selectors/commentsSelectors";
+
+import handleSocketEvent from "./handleSocketEvent";
 
 function connect() {
   const socket = io();
@@ -69,8 +69,9 @@ function* read(socket: any) {
       case WEBSOCKET_EVENTS.CONNECTED:
         yield put(setIsWebsocketConnected(true));
         break;
-      default:
-        yield put(commentEvent(action));
+      default: {
+        yield call(handleSocketEvent, action);
+      }
     }
   }
 }
@@ -95,9 +96,9 @@ function* handleIO(socket: any) {
 
 function* flow() {
   while (true) {
-    const { payload } = yield take([
-      ReduxActionTypes.FETCH_USER_DETAILS_SUCCESS,
-      ReduxActionTypes.RETRY_WEBSOCKET_CONNECTION,
+    yield take([
+      ReduxActionTypes.SET_ARE_COMMENTS_ENABLED,
+      ReduxActionTypes.RETRY_WEBSOCKET_CONNECTION, // for manually triggering reconnection
     ]);
 
     try {
@@ -108,14 +109,17 @@ function* flow() {
        * We only need to retry incase the socket connection isn't made
        * in the first attempt itself
        */
-      if (payload.name !== ANONYMOUS_USERNAME) {
-        const commentsEnabled = yield select(areCommentsEnabledForUser);
-        if (!commentsEnabled) return;
-
+      const commentsEnabled = yield select(areCommentsEnabledForUserAndApp);
+      if (commentsEnabled) {
         const socket = yield call(connect);
         const task = yield fork(handleIO, socket);
         yield put(setIsWebsocketConnected(true));
-        yield take(ReduxActionTypes.LOGOUT_USER_INIT);
+        // Disconnect if comments are disabled or user is logged out
+        yield take([
+          ReduxActionTypes.SET_ARE_COMMENTS_ENABLED,
+          ReduxActionTypes.LOGOUT_USER_INIT,
+        ]);
+        yield take();
         yield cancel(task);
         socket.disconnect();
       }
