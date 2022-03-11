@@ -6,14 +6,14 @@
       "children": [
         {
           "label": "Commands",
-          "description": "Choose method you would like to use to send an email",
-          "configProperty": "actionConfiguration.formData.command",
+          "description": "Choose the method you would like to use",
+          "configProperty": "actionConfiguration.formData.command.data",
           "controlType": "DROP_DOWN",
-          "initialValue": "SEND",
+          "initialValue": "EXAMPLE",
           "options": [
             {
-              "label": "Send Email",
-              "value": "SEND"
+              "label": "Example command",
+              "value": "EXAMPLE"
             }
           ]
         }
@@ -21,6 +21,6 @@
     }
   ],
   "files": [
-    "send.json"
+    "mock-example.json"
   ]
 }
