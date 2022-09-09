@@ -1,34 +1,23 @@
 import React, { useState } from "react";
-import { connect, useDispatch, useSelector } from "react-redux";
-import {
-  change,
-  formValueSelector,
-  InjectedFormProps,
-  reduxForm,
-} from "redux-form";
+import { useDispatch, useSelector } from "react-redux";
 import {
   HTTP_METHOD_OPTIONS,
   API_EDITOR_TABS,
-} from "constants/ApiEditorConstants";
+} from "constants/ApiEditorConstants/CommonApiConstants";
+import { GRAPHQL_HTTP_METHOD_OPTIONS } from "constants/ApiEditorConstants/GraphQLEditorConstants";
 import styled from "styled-components";
 import FormLabel from "components/editorComponents/FormLabel";
 import FormRow from "components/editorComponents/FormRow";
 import { PaginationField, SuggestedWidget } from "api/ActionAPI";
-import { API_EDITOR_FORM_NAME } from "@appsmith/constants/forms";
-import Pagination from "./Pagination";
-import { Action, PaginationType } from "entities/Action";
+import { Action, isGraphqlPlugin, PaginationType } from "entities/Action";
 import {
   setGlobalSearchQuery,
   toggleShowGlobalSearchModal,
 } from "actions/globalSearchActions";
 import KeyValueFieldArray from "components/editorComponents/form/fields/KeyValueFieldArray";
-import PostBodyData from "./PostBodyData";
-import ApiResponseView, {
-  EMPTY_RESPONSE,
-} from "components/editorComponents/ApiResponseView";
+import ApiResponseView from "components/editorComponents/ApiResponseView";
 import EmbeddedDatasourcePathField from "components/editorComponents/form/fields/EmbeddedDatasourcePathField";
 import { AppState } from "@appsmith/reducers";
-import { getApiName } from "selectors/formSelectors";
 import ActionNameEditor from "components/editorComponents/ActionNameEditor";
 import ActionSettings from "pages/Editor/ActionSettings";
 import RequestDropdownField from "components/editorComponents/form/fields/RequestDropdownField";
@@ -52,20 +41,12 @@ import {
   API_EDITOR_TAB_TITLES,
   createMessage,
   WIDGET_BIND_HELP,
-  API_PANE_NO_BODY,
 } from "@appsmith/constants/messages";
 import AnalyticsUtil from "utils/AnalyticsUtil";
 import CloseEditor from "components/editorComponents/CloseEditor";
 import { useParams } from "react-router";
-import get from "lodash/get";
 import DataSourceList from "./ApiRightPane";
 import { Datasource } from "entities/Datasource";
-import {
-  getActionResponses,
-  getActionData,
-  getAction,
-} from "selectors/entitiesSelector";
-import { isEmpty } from "lodash";
 import equal from "fast-deep-equal/es6";
 
 import { Colors } from "constants/Colors";
@@ -76,6 +57,7 @@ import { TooltipComponent } from "design-system";
 import { TOOLTIP_HOVER_ON_DELAY } from "constants/AppConstants";
 import { Classes as BluePrintClasses } from "@blueprintjs/core";
 import { replayHighlightClass } from "globalStyles/portals";
+import { getPlugin } from "selectors/entitiesSelector";
 
 const Form = styled.form`
   position: relative;
@@ -210,16 +192,6 @@ const TabSection = styled.div`
   overflow: auto;
 `;
 
-const NoBodyMessage = styled.div`
-  margin-top: 20px;
-  display: flex;
-  justify-content: center;
-
-  .${Classes.TEXT} {
-    color: ${(props) => props.theme.colors.apiPane.body.text};
-  }
-`;
-
 const CalloutContent = styled.div`
   display: flex;
   align-items: center;
@@ -240,7 +212,7 @@ const Wrapper = styled.div`
   height: calc(100% - 110px);
   position: relative;
 `;
-interface APIFormProps {
+export interface CommonFormProps {
   pluginId: string;
   onRunClick: (paginationField?: PaginationField) => void;
   onDeleteClick: () => void;
@@ -248,7 +220,6 @@ interface APIFormProps {
   isDeleting: boolean;
   paginationType: PaginationType;
   appName: string;
-  httpMethodFromForm: string;
   actionConfigurationHeaders?: any;
   actionConfigurationParams?: any;
   datasourceHeaders?: any;
@@ -271,7 +242,16 @@ interface APIFormProps {
   currentActionDatasourceId: string;
 }
 
-type Props = APIFormProps & InjectedFormProps<Action, APIFormProps>;
+type CommonFormPropsWithExtraParams = CommonFormProps & {
+  formName: string;
+  // Body Tab Component which is passed on from the Parent Component
+  bodyUIComponent: JSX.Element;
+  // Pagination Tab Component which is passed on from the Parent Component
+  paginationUIComponent: JSX.Element;
+  handleSubmit: any;
+  // defaultSelectedTabIndex
+  defaultTabSelected?: number;
+};
 
 export const NameWrapper = styled.div`
   display: flex;
@@ -536,8 +516,15 @@ function ImportedDatas(props: { data: any; attributeName: string }) {
   );
 }
 
-function ApiEditorForm(props: Props) {
-  const [selectedIndex, setSelectedIndex] = useState(0);
+/**
+ * Commons editor form which is being used by API and GraphQL. Since most of the things were common to both so picking out the common part was a better option. For now Body and Pagination component are being passed on by the using component.
+ * @param props type CommonFormPropsWithExtraParams
+ * @returns Editor with respect to which type is using it
+ */
+function CommonEditorForm(props: CommonFormPropsWithExtraParams) {
+  const [selectedIndex, setSelectedIndex] = useState(
+    props.defaultTabSelected || 0,
+  );
   const [
     apiBindHelpSectionVisible,
     setApiBindHelpSectionVisible,
@@ -548,10 +535,9 @@ function ApiEditorForm(props: Props) {
     actionConfigurationParams,
     actionName,
     currentActionDatasourceId,
-    handleSubmit,
+    formName,
     headersCount,
     hintMessages,
-    httpMethodFromForm,
     isRunning,
     onRunClick,
     paramsCount,
@@ -562,7 +548,6 @@ function ApiEditorForm(props: Props) {
     updateDatasource,
   } = props;
   const dispatch = useDispatch();
-  const allowPostBody = httpMethodFromForm;
 
   const params = useParams<{ apiId?: string; queryId?: string }>();
 
@@ -577,6 +562,12 @@ function ApiEditorForm(props: Props) {
   );
   const { pageId } = useParams<ExplorerURLParams>();
 
+  const plugin = useSelector((state: AppState) =>
+    getPlugin(state, pluginId ?? ""),
+  );
+
+  const isGraphql = isGraphqlPlugin(plugin);
+
   const theme = EditorTheme.LIGHT;
   const handleClickLearnHow = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -588,7 +579,7 @@ function ApiEditorForm(props: Props) {
   return (
     <>
       <CloseEditor />
-      <Form onSubmit={handleSubmit}>
+      <Form onSubmit={props.handleSubmit}>
         <MainConfiguration>
           <FormRow className="form-row-header">
             <NameWrapper className="t--nameOfApi">
@@ -627,7 +618,9 @@ function ApiEditorForm(props: Props) {
                 height={"35px"}
                 name="actionConfiguration.httpMethod"
                 optionWidth={"110px"}
-                options={HTTP_METHOD_OPTIONS}
+                options={
+                  isGraphql ? GRAPHQL_HTTP_METHOD_OPTIONS : HTTP_METHOD_OPTIONS
+                }
                 placeholder="Method"
                 width={"110px"}
               />
@@ -636,6 +629,7 @@ function ApiEditorForm(props: Props) {
               <EmbeddedDatasourcePathField
                 actionName={actionName}
                 codeEditorVisibleOverflow
+                formName={formName}
                 name="actionConfiguration.path"
                 placeholder="https://mock-api.appsmith.com/users"
                 pluginId={pluginId}
@@ -715,34 +709,17 @@ function ApiEditorForm(props: Props) {
                   {
                     key: API_EDITOR_TABS.BODY,
                     title: createMessage(API_EDITOR_TAB_TITLES.BODY),
-                    panelComponent: allowPostBody ? (
-                      <PostBodyData
-                        dataTreePath={`${actionName}.config`}
-                        theme={theme}
-                      />
-                    ) : (
-                      <NoBodyMessage>
-                        <Text type={TextType.P2}>
-                          {createMessage(API_PANE_NO_BODY)}
-                        </Text>
-                      </NoBodyMessage>
-                    ),
+                    panelComponent: props.bodyUIComponent,
                   },
                   {
                     key: API_EDITOR_TABS.PAGINATION,
                     title: createMessage(API_EDITOR_TAB_TITLES.PAGINATION),
-                    panelComponent: (
-                      <Pagination
-                        onTestClick={props.onRunClick}
-                        paginationType={props.paginationType}
-                        theme={theme}
-                      />
-                    ),
+                    panelComponent: props.paginationUIComponent,
                   },
                   {
                     key: API_EDITOR_TABS.AUTHENTICATION,
                     title: createMessage(API_EDITOR_TAB_TITLES.AUTHENTICATION),
-                    panelComponent: <ApiAuthentication />,
+                    panelComponent: <ApiAuthentication formName={formName} />,
                   },
                   {
                     key: API_EDITOR_TABS.SETTINGS,
@@ -751,7 +728,7 @@ function ApiEditorForm(props: Props) {
                       <SettingsWrapper>
                         <ActionSettings
                           actionSettingsConfig={settingsConfig}
-                          formName={API_EDITOR_FORM_NAME}
+                          formName={formName}
                           theme={theme}
                         />
                       </SettingsWrapper>
@@ -784,134 +761,4 @@ function ApiEditorForm(props: Props) {
   );
 }
 
-const selector = formValueSelector(API_EDITOR_FORM_NAME);
-
-type ReduxDispatchProps = {
-  updateDatasource: (datasource: Datasource) => void;
-};
-
-const mapDispatchToProps = (dispatch: any): ReduxDispatchProps => ({
-  updateDatasource: (datasource) => {
-    dispatch(change(API_EDITOR_FORM_NAME, "datasource", datasource));
-  },
-});
-
-export default connect((state: AppState, props: { pluginId: string }) => {
-  const httpMethodFromForm = selector(state, "actionConfiguration.httpMethod");
-  const actionConfigurationHeaders =
-    selector(state, "actionConfiguration.headers") || [];
-  const actionConfigurationParams =
-    selector(state, "actionConfiguration.queryParameters") || [];
-  let datasourceFromAction = selector(state, "datasource");
-  if (datasourceFromAction && datasourceFromAction.hasOwnProperty("id")) {
-    datasourceFromAction = state.entities.datasources.list.find(
-      (d) => d.id === datasourceFromAction.id,
-    );
-  }
-
-  // get messages from action itself
-  const actionId = selector(state, "id");
-  const action = getAction(state, actionId);
-  const hintMessages = action?.messages;
-
-  const datasourceHeaders =
-    get(datasourceFromAction, "datasourceConfiguration.headers") || [];
-  const datasourceParams =
-    get(datasourceFromAction, "datasourceConfiguration.queryParameters") || [];
-
-  const apiId = selector(state, "id");
-  const currentActionDatasourceId = selector(state, "datasource.id");
-
-  const actionName = getApiName(state, apiId) || "";
-  const headers = selector(state, "actionConfiguration.headers");
-  let headersCount = 0;
-
-  if (Array.isArray(headers)) {
-    const validHeaders = headers.filter(
-      (value) => value.key && value.key !== "",
-    );
-    headersCount += validHeaders.length;
-  }
-
-  if (Array.isArray(datasourceHeaders)) {
-    const validHeaders = datasourceHeaders.filter(
-      (value: any) => value.key && value.key !== "",
-    );
-    headersCount += validHeaders.length;
-  }
-
-  const params = selector(state, "actionConfiguration.queryParameters");
-  let paramsCount = 0;
-
-  if (Array.isArray(params)) {
-    const validParams = params.filter((value) => value.key && value.key !== "");
-    paramsCount = validParams.length;
-  }
-
-  if (Array.isArray(datasourceParams)) {
-    const validParams = datasourceParams.filter(
-      (value: any) => value.key && value.key !== "",
-    );
-    paramsCount += validParams.length;
-  }
-
-  const responses = getActionResponses(state);
-  let hasResponse = false;
-  let suggestedWidgets;
-  if (apiId && apiId in responses) {
-    const response = responses[apiId] || EMPTY_RESPONSE;
-    hasResponse =
-      !isEmpty(response.statusCode) && response.statusCode[0] === "2";
-    suggestedWidgets = response.suggestedWidgets;
-  }
-
-  const actionData = getActionData(state, apiId);
-  let responseDisplayFormat: { title: string; value: string };
-  let responseDataTypes: { key: string; title: string }[];
-  if (!!actionData && actionData.responseDisplayFormat) {
-    responseDataTypes = actionData.dataTypes.map((data) => {
-      return {
-        key: data.dataType,
-        title: data.dataType,
-      };
-    });
-    responseDisplayFormat = {
-      title: actionData.responseDisplayFormat,
-      value: actionData.responseDisplayFormat,
-    };
-  } else {
-    responseDataTypes = [];
-    responseDisplayFormat = {
-      title: "",
-      value: "",
-    };
-  }
-
-  return {
-    actionName,
-    apiId,
-    httpMethodFromForm,
-    actionConfigurationHeaders,
-    actionConfigurationParams,
-    currentActionDatasourceId,
-    datasourceHeaders,
-    datasourceParams,
-    headersCount,
-    paramsCount,
-    hintMessages,
-    datasources: state.entities.datasources.list.filter(
-      (d) => d.pluginId === props.pluginId,
-    ),
-    currentPageId: state.entities.pageList.currentPageId,
-    applicationId: state.entities.pageList.applicationId,
-    responseDataTypes,
-    responseDisplayFormat,
-    suggestedWidgets,
-    hasResponse,
-  };
-}, mapDispatchToProps)(
-  reduxForm<Action, APIFormProps>({
-    form: API_EDITOR_FORM_NAME,
-    enableReinitialize: true,
-  })(ApiEditorForm),
-);
+export default CommonEditorForm;

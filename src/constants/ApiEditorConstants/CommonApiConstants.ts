@@ -1,6 +1,3 @@
-import { ApiActionConfig } from "entities/Action";
-import { DEFAULT_ACTION_TIMEOUT } from "@appsmith/constants/ApiConstants";
-
 // This constant lists all the support HTTP methods & their color in
 // the entity explorer
 export enum HTTP_METHOD {
@@ -31,8 +28,6 @@ export enum API_EDITOR_TABS {
 export const HTTP_METHOD_OPTIONS = Object.values(HTTP_METHOD).map((method) => ({
   value: method,
 }));
-
-export const REST_PLUGIN_PACKAGE_NAME = "restapi-plugin";
 
 export const EMPTY_KEY_VALUE_PAIRS = [
   { key: "", value: "" },
@@ -67,27 +62,6 @@ export const HTTP_METHODS_DEFAULT_FORMAT_TYPES: Record<HTTP_METHOD, string> = {
   PUT: POST_BODY_FORMAT_OPTIONS.JSON,
   DELETE: POST_BODY_FORMAT_OPTIONS.RAW,
   PATCH: POST_BODY_FORMAT_OPTIONS.JSON,
-};
-
-const DEFAULT_METHOD_TYPE = HTTP_METHOD.GET;
-
-export const DEFAULT_API_ACTION_CONFIG: ApiActionConfig = {
-  timeoutInMillisecond: DEFAULT_ACTION_TIMEOUT,
-  encodeParamsToggle: true,
-  httpMethod: DEFAULT_METHOD_TYPE,
-  headers: EMPTY_KEY_VALUE_PAIRS.slice(),
-  queryParameters: EMPTY_KEY_VALUE_PAIRS.slice(),
-  body: "",
-  bodyFormData: [],
-  formData: {
-    apiContentType: HTTP_METHODS_DEFAULT_FORMAT_TYPES[DEFAULT_METHOD_TYPE],
-  },
-  pluginSpecifiedTemplates: [
-    {
-      // JSON smart substitution
-      value: true,
-    },
-  ],
 };
 
 export const DEFAULT_PROVIDER_OPTION = "Business Software";
