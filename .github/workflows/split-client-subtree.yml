@@ -47,11 +47,9 @@ jobs:
       - name: Perform subtree split
         run: |
           # Split the app/client directory into a new branch
-          git subtree split --prefix=app/client -b client
-          git subtree split --prefix=app/server -b server
+          git subtree split --prefix=app/client -b client --rejoin
 
-      - name: Push the client-branch to origin
+      - name: Push the clien to origin
         run: |
           # Push the split branch to your forked repository
           git push origin client --force
-          git push origin server --force
