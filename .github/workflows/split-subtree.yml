@@ -1,0 +1,57 @@
+name: Subtree Split from Upstream
+
+# This workflow run every day at 8 AM, or you can adjust the schedule as needed.
+on:
+  schedule:
+    - cron: '0 8 * * *'  # Run every day at 8 AM
+  workflow_dispatch:  # Allows you to trigger this workflow manually
+
+jobs:
+  split-subtree:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch the entire history
+
+      - name: Set up Git
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+      
+      - name: Add upstream repository
+        run: |
+          # Add the upstream repository (original repo you forked)
+          git remote add upstream https://github.com/appsmithorg/appsmith.git
+          git fetch upstream release
+
+      - name: Check for updates in upstream main branch
+        run: |
+          # Compare the upstream/main with your fork's main to check for new commits
+          UPSTREAM_COMMIT=$(git rev-parse upstream/release)
+          LOCAL_COMMIT=$(git rev-parse origin/release)
+          if [ "$UPSTREAM_COMMIT" != "$LOCAL_COMMIT" ]; then
+            echo "Upstream repository has changed. Proceeding with subtree split."
+          else
+            echo "No changes in upstream. Exiting."
+            exit 0
+          fi
+
+      - name: Fetch upstream changes
+        run: |
+          # Fetch the upstream branch to ensure it is up-to-date
+          git fetch upstream release
+
+      - name: Perform subtree split
+        run: |
+          # Split the app/client directory into a new branch
+          git subtree split --prefix=app/client -b client
+          git subtree split --prefix=app/server -b server
+
+      - name: Push the client-branch to origin
+        run: |
+          # Push the split branch to your forked repository
+          git push origin client --force
+          git push origin server --force
