@@ -1,4 +1,4 @@
-name: Subtree Split from Upstream
+name: Client Subtree Split from Upstream
 
 # This workflow run every day at 8 AM, or you can adjust the schedule as needed.
 on:
