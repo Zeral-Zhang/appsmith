@@ -28,9 +28,6 @@ import type { SourceEntity } from "entities/AppsmithConsole";
 import type { Action } from "entities/Action";
 import { getActionData } from "ee/selectors/entitiesSelector";
 import { actionResponseDisplayDataFormats } from "../utils";
-import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
-import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
-import { getHasExecuteActionPermission } from "ee/utils/BusinessFeatures/permissionPageHelpers";
 import { getErrorAsString } from "sagas/ActionExecution/errorUtils";
 import { isString } from "lodash";
 import ActionExecutionInProgressView from "components/editorComponents/ActionExecutionInProgressView";
@@ -38,7 +35,7 @@ import { EditorTheme } from "components/editorComponents/CodeEditor/EditorConfig
 import BindDataButton from "./BindDataButton";
 import {
   getPluginActionDebuggerState,
-  setPluginActionEditorDebuggerState,
+  setPluginActionEditorSelectedTab,
 } from "PluginActionEditor/store";
 import { EDITOR_TABS } from "constants/QueryEditorConstants";
 import {
@@ -72,6 +69,7 @@ const ResponseContentWrapper = styled.div<{ isError: boolean }>`
 
 interface Props {
   actionSource: SourceEntity;
+  isRunDisabled?: boolean;
   isRunning: boolean;
   onRunClick: () => void;
   currentActionConfig: Action;
@@ -84,18 +82,12 @@ const QueryResponseTab = (props: Props) => {
     actionName,
     actionSource,
     currentActionConfig,
+    isRunDisabled = false,
     isRunning,
     onRunClick,
     runErrorMessage,
   } = props;
   const dispatch = useDispatch();
-
-  const isFeatureEnabled = useFeatureFlag(FEATURE_FLAG.license_gac_enabled);
-
-  const isExecutePermitted = getHasExecuteActionPermission(
-    isFeatureEnabled,
-    currentActionConfig?.userPermissions,
-  );
 
   const actionResponse = useSelector((state) =>
     getActionData(state, currentActionConfig.id),
@@ -219,11 +211,7 @@ const QueryResponseTab = (props: Props) => {
   }
 
   const navigateToSettings = useCallback(() => {
-    dispatch(
-      setPluginActionEditorDebuggerState({
-        selectedTab: EDITOR_TABS.SETTINGS,
-      }),
-    );
+    dispatch(setPluginActionEditorSelectedTab(EDITOR_TABS.SETTINGS));
   }, [dispatch]);
 
   const preparedStatementCalloutLinks: CalloutLinkProps[] = [
@@ -345,7 +333,7 @@ const QueryResponseTab = (props: Props) => {
         )}
       {!output && !error && (
         <NoResponse
-          isRunDisabled={!isExecutePermitted}
+          isRunDisabled={isRunDisabled}
           isRunning={isRunning}
           onRunClick={responseTabOnRunClick}
         />
