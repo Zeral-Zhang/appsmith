@@ -19,7 +19,7 @@ let dsName: any, newStoreSecret: any;
 
 describe(
   "Validate MySQL Generate CRUD with JSON Form",
-  { tags: ["@tag.Datasource"] },
+  { tags: ["@tag.Datasource", "@tag.Git", "@tag.AccessControl"] },
   () => {
     // beforeEach(function() {
     //   if (INTERCEPT.MYSQL) {
@@ -399,9 +399,7 @@ describe(
       col3Text: string,
       jsonFromHeader: string,
     ) {
-      agHelper.GetNClick(
-        `${dataSources._generatePageBtn}, ${dataSources._datasourceCardGeneratePageBtn}`,
-      );
+      agHelper.GetNClick(dataSources._datasourceCardGeneratePageBtn);
       assertHelper.AssertNetworkStatus("@replaceLayoutWithCRUDPage", 201);
       agHelper.AssertContains("Successfully generated a page");
       //assertHelper.AssertNetworkStatus("@getActions", 200);//Since failing sometimes

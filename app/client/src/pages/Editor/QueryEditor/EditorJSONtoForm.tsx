@@ -17,7 +17,6 @@ import {
 import { useParams } from "react-router";
 import type { AppState } from "ee/reducers";
 import { thinScrollbar } from "constants/DefaultTheme";
-import ActionRightPane from "components/editorComponents/ActionRightPane";
 import type { ActionResponse } from "api/ActionAPI";
 import type { Plugin } from "api/PluginApi";
 import type { UIComponentTypes } from "api/PluginApi";
@@ -29,12 +28,12 @@ import {
 } from "PluginActionEditor/store";
 import type { SourceEntity } from "entities/AppsmithConsole";
 import { ENTITY_TYPE as SOURCE_ENTITY_TYPE } from "ee/entities/AppsmithConsole/utils";
-import { DocsLink, openDoc } from "../../../constants/DocumentationLinks";
+import { DocsLink, openDoc } from "constants/DocumentationLinks";
 import { QueryEditorContext } from "./QueryEditorContext";
 import QueryDebuggerTabs from "./QueryDebuggerTabs";
-import useShowSchema from "components/editorComponents/ActionRightPane/useShowSchema";
+import useShowSchema from "PluginActionEditor/components/PluginActionResponse/hooks/useShowSchema";
 import { doesPluginRequireDatasource } from "ee/entities/Engine/actionHelpers";
-import FormRender from "./FormRender";
+import FormRender from "PluginActionEditor/components/PluginActionForm/components/UQIEditor/FormRender";
 import QueryEditorHeader from "./QueryEditorHeader";
 import RunHistory from "ee/components/RunHistory";
 import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
@@ -377,7 +376,7 @@ export function EditorJSONtoForm(props: Props) {
             <RunHistory />
           </SecondaryWrapper>
         </div>
-        <ActionRightPane additionalSections={actionRightPaneAdditionSections} />
+        {actionRightPaneAdditionSections}
       </Wrapper>
     </QueryFormContainer>
   );
