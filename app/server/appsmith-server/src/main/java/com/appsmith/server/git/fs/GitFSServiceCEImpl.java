@@ -47,7 +47,6 @@ import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.reactive.TransactionalOperator;
 import org.springframework.util.StringUtils;
 import reactor.core.observability.micrometer.Micrometer;
 import reactor.core.publisher.Flux;
@@ -77,7 +76,6 @@ public class GitFSServiceCEImpl implements GitHandlingServiceCE {
     private final UserDataService userDataService;
     protected final UserService userService;
     private final EmailConfig emailConfig;
-    private final TransactionalOperator transactionalOperator;
 
     protected final AnalyticsService analyticsService;
     private final ObservationRegistry observationRegistry;
@@ -567,5 +565,32 @@ public class GitFSServiceCEImpl implements GitHandlingServiceCE {
                                     + gitMetadata.getBranchName())));
         }
         return Mono.just(pushResult);
+    }
+
+    /**
+     * File system implementation of fetching remote changes. equivalent to git fetch <ref-name>
+     * @param jsonTransformationDTO : DTO to create path and other ref related details
+     * @param gitAuth : authentication holder
+     * @return : returns string for remote fetch
+     */
+    @Override
+    public Mono<String> fetchRemoteChanges(ArtifactJsonTransformationDTO jsonTransformationDTO, GitAuth gitAuth) {
+
+        String workspaceId = jsonTransformationDTO.getWorkspaceId();
+        String baseArtifactId = jsonTransformationDTO.getBaseArtifactId();
+        String repoName = jsonTransformationDTO.getRepoName();
+        String refName = jsonTransformationDTO.getRefName();
+
+        ArtifactType artifactType = jsonTransformationDTO.getArtifactType();
+        GitArtifactHelper<?> gitArtifactHelper = gitArtifactHelperResolver.getArtifactHelper(artifactType);
+        Path repoSuffix = gitArtifactHelper.getRepoSuffixPath(workspaceId, baseArtifactId, repoName);
+
+        Path repoPath = fsGitHandler.createRepoPath(repoSuffix);
+        Mono<Boolean> checkoutBranchMono = fsGitHandler.checkoutToBranch(repoSuffix, refName);
+
+        Mono<String> fetchRemoteMono = fsGitHandler.fetchRemote(
+                repoPath, gitAuth.getPublicKey(), gitAuth.getPrivateKey(), true, refName, false);
+
+        return checkoutBranchMono.then(Mono.defer(() -> fetchRemoteMono));
     }
 }
