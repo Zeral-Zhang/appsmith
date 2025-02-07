@@ -13,6 +13,7 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
+          ref: pg  # Ensures the workflow always runs in the `pg` branch
           fetch-depth: 0  # Fetch entire history to ensure correct subtree operations
 
       - name: Set up Git
