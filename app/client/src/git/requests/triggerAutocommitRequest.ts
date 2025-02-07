@@ -1,10 +1,32 @@
 import Api from "api/Api";
 import { GIT_BASE_URL } from "./constants";
-import type { AxiosResponse } from "axios";
+import type { AxiosPromise } from "axios";
 import type { TriggerAutocommitResponse } from "./triggerAutocommitRequest.types";
+import type { GitArtifactType } from "git/constants/enums";
+
+async function triggerAutocommitRequestOld(
+  branchedApplicationId: string,
+): AxiosPromise<TriggerAutocommitResponse> {
+  return Api.post(`${GIT_BASE_URL}/auto-commit/app/${branchedApplicationId}`);
+}
+
+async function triggerAutocommitRequestNew(
+  artifactType: GitArtifactType,
+  refArtifactId: string,
+): AxiosPromise<TriggerAutocommitResponse> {
+  return Api.post(
+    `${GIT_BASE_URL}/${artifactType}/${refArtifactId}/auto-commit`,
+  );
+}
 
 export default async function triggerAutocommitRequest(
-  branchedApplicationId: string,
-): Promise<AxiosResponse<TriggerAutocommitResponse>> {
-  return Api.post(`${GIT_BASE_URL}/auto-commit/app/${branchedApplicationId}`);
+  artifactType: GitArtifactType,
+  refArtifactId: string,
+  isNew: boolean,
+): AxiosPromise<TriggerAutocommitResponse> {
+  if (isNew) {
+    return triggerAutocommitRequestNew(artifactType, refArtifactId);
+  } else {
+    return triggerAutocommitRequestOld(refArtifactId);
+  }
 }

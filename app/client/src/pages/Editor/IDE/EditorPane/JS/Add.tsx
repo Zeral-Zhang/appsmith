@@ -2,10 +2,14 @@ import React, { useCallback, useState } from "react";
 import SegmentAddHeader from "../components/SegmentAddHeader";
 import { EDITOR_PANE_TEXTS, createMessage } from "ee/constants/messages";
 import type { ListItemProps } from "@appsmith/ads";
-import { Flex, SearchInput } from "@appsmith/ads";
+import {
+  EntityGroupsList,
+  Flex,
+  SearchInput,
+  NoSearchResults,
+} from "@appsmith/ads";
 import { useDispatch, useSelector } from "react-redux";
 import { getCurrentPageId } from "selectors/editorSelectors";
-import GroupedList from "../components/GroupedList";
 import {
   useGroupedAddJsOperations,
   useJSAdd,
@@ -13,11 +17,11 @@ import {
 import type { ActionOperation } from "components/editorComponents/GlobalSearch/utils";
 import { createAddClassName } from "../utils";
 import { FocusEntity } from "navigation/FocusEntity";
-import { EmptySearchResult } from "../components/EmptySearchResult";
 import { getIDEViewMode } from "selectors/ideSelectors";
 import type { FlexProps } from "@appsmith/ads";
 import { EditorViewMode } from "ee/entities/IDE/constants";
 import { filterEntityGroupsBySearchTerm } from "IDE/utils";
+import { DEFAULT_GROUP_LIST_SIZE } from "../../constants";
 
 const AddJS = () => {
   const dispatch = useDispatch();
@@ -49,13 +53,13 @@ const AddJS = () => {
           : "",
       descriptionType: "inline",
       onClick: onCreateItemClick.bind(null, data),
-      wrapperClassName: createAddClassName(title),
+      className: createAddClassName(title),
     } as ListItemProps;
   };
 
   const itemGroups = groupedJsOperations.map(
     ({ className, operations, title }) => ({
-      groupTitle: title,
+      groupTitle: title || "",
       className: className,
       items: operations.map(getListItems),
     }),
@@ -95,11 +99,21 @@ const AddJS = () => {
         />
         <SearchInput onChange={setSearchTerm} value={searchTerm} />
         {filteredItemGroups.length > 0 ? (
-          <GroupedList groups={filteredItemGroups} />
+          <EntityGroupsList
+            flexProps={{
+              pb: "spaces-3",
+            }}
+            groups={filteredItemGroups}
+            showDivider
+            visibleItems={DEFAULT_GROUP_LIST_SIZE}
+          />
         ) : null}
         {filteredItemGroups.length === 0 && searchTerm !== "" ? (
-          <EmptySearchResult
-            type={createMessage(EDITOR_PANE_TEXTS.search_objects.jsObject)}
+          <NoSearchResults
+            text={createMessage(
+              EDITOR_PANE_TEXTS.empty_search_result,
+              createMessage(EDITOR_PANE_TEXTS.search_objects.jsObject),
+            )}
           />
         ) : null}
       </Flex>

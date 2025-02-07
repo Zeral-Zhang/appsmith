@@ -3,7 +3,7 @@ import { usePluginActionContext } from "PluginActionEditor/PluginActionContext";
 import type { BottomTab } from "components/editorComponents/EntityBottomTabs";
 import { getIDEViewMode } from "selectors/ideSelectors";
 import { useSelector } from "react-redux";
-import { EditorViewMode } from "ee/entities/IDE/constants";
+import { EditorViewMode, IDE_TYPE } from "ee/entities/IDE/constants";
 import { DEBUGGER_TAB_KEYS } from "components/editorComponents/Debugger/constants";
 import {
   createMessage,
@@ -11,10 +11,11 @@ import {
   DEBUGGER_HEADERS,
   DEBUGGER_LOGS,
   DEBUGGER_RESPONSE,
+  DEBUGGER_STATE,
 } from "ee/constants/messages";
 import ErrorLogs from "components/editorComponents/Debugger/Errors";
 import DebuggerLogs from "components/editorComponents/Debugger/DebuggerLogs";
-import { PluginType } from "entities/Action";
+import { PluginType } from "entities/Plugin";
 import { ApiResponseHeaders } from "PluginActionEditor/components/PluginActionResponse/components/ApiResponseHeaders";
 import { EditorTheme } from "components/editorComponents/CodeEditor/EditorConfig";
 import { getErrorCount } from "selectors/debuggerSelectors";
@@ -24,7 +25,7 @@ import {
 } from "PluginActionEditor/store";
 import { doesPluginRequireDatasource } from "ee/entities/Engine/actionHelpers";
 import useShowSchema from "PluginActionEditor/components/PluginActionResponse/hooks/useShowSchema";
-import { Datasource } from "PluginActionEditor/components/PluginActionResponse/components/DatasourceTab";
+import { DatasourceTab } from "PluginActionEditor/components/PluginActionResponse/components/DatasourceTab";
 import {
   useBlockExecution,
   useHandleRunClick,
@@ -32,6 +33,9 @@ import {
 } from "PluginActionEditor/hooks";
 import useDebuggerTriggerClick from "components/editorComponents/Debugger/hooks/useDebuggerTriggerClick";
 import { Response } from "PluginActionEditor/components/PluginActionResponse/components/Response";
+import { StateInspector } from "components/editorComponents/Debugger/StateInspector";
+import { useLocation } from "react-router";
+import { getIDETypeByUrl } from "ee/entities/IDE/utils";
 
 function usePluginActionResponseTabs() {
   const { action, actionResponse, datasource, plugin } =
@@ -64,10 +68,10 @@ function usePluginActionResponseTabs() {
         key: DEBUGGER_TAB_KEYS.DATASOURCE_TAB,
         title: "Datasource",
         panelComponent: (
-          <Datasource
+          <DatasourceTab
             currentActionId={action.id}
-            datasourceId={datasource?.id || ""}
-            datasourceName={datasource?.name || ""}
+            datasourceId={datasource?.id || action.datasource.id || ""}
+            datasourceName={datasource?.name || action.datasource.name || ""}
           />
         ),
       });
@@ -112,6 +116,7 @@ function usePluginActionResponseTabs() {
       PluginType.REMOTE,
       PluginType.SAAS,
       PluginType.INTERNAL,
+      PluginType.EXTERNAL_SAAS,
     ].includes(plugin.type)
   ) {
     if (showSchema) {
@@ -119,10 +124,10 @@ function usePluginActionResponseTabs() {
         key: DEBUGGER_TAB_KEYS.DATASOURCE_TAB,
         title: "Datasource",
         panelComponent: (
-          <Datasource
+          <DatasourceTab
             currentActionId={action.id}
-            datasourceId={datasource?.id || ""}
-            datasourceName={datasource?.name || ""}
+            datasourceId={datasource?.id || action.datasource.id || ""}
+            datasourceName={datasource?.name || action.datasource.name || ""}
           />
         ),
       });
@@ -145,6 +150,10 @@ function usePluginActionResponseTabs() {
     });
   }
 
+  const location = useLocation();
+
+  const ideType = getIDETypeByUrl(location.pathname);
+
   if (IDEViewMode === EditorViewMode.FullScreen) {
     tabs.push(
       {
@@ -159,6 +168,14 @@ function usePluginActionResponseTabs() {
         panelComponent: <ErrorLogs />,
       },
     );
+
+    if (ideType === IDE_TYPE.App) {
+      tabs.push({
+        key: DEBUGGER_TAB_KEYS.STATE_TAB,
+        title: createMessage(DEBUGGER_STATE),
+        panelComponent: <StateInspector />,
+      });
+    }
   }
 
   return tabs;
