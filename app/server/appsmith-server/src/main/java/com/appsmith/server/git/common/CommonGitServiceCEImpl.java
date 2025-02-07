@@ -100,8 +100,9 @@ import static com.appsmith.external.git.constants.GitConstants.DEFAULT_COMMIT_ME
 import static com.appsmith.external.git.constants.GitConstants.EMPTY_COMMIT_ERROR_MESSAGE;
 import static com.appsmith.external.git.constants.GitConstants.GIT_CONFIG_ERROR;
 import static com.appsmith.external.git.constants.GitConstants.GIT_PROFILE_ERROR;
-import static com.appsmith.external.git.constants.ce.GitSpanCE.OPS_COMMIT;
-import static com.appsmith.external.git.constants.ce.GitSpanCE.OPS_STATUS;
+import static com.appsmith.external.git.constants.GitConstants.README_FILE_NAME;
+import static com.appsmith.external.git.constants.GitSpan.OPS_COMMIT;
+import static com.appsmith.external.git.constants.GitSpan.OPS_STATUS;
 import static com.appsmith.external.helpers.AppsmithBeanUtils.copyNestedNonNullProperties;
 import static com.appsmith.server.constants.ArtifactType.APPLICATION;
 import static com.appsmith.server.constants.SerialiseArtifactObjective.VERSION_CONTROL;
@@ -228,7 +229,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
         GitArtifactMetadata gitData = branchedArtifact.getGitArtifactMetadata();
         if (gitData == null
                 || StringUtils.isEmptyOrNull(
-                        branchedArtifact.getGitArtifactMetadata().getBranchName())) {
+                        branchedArtifact.getGitArtifactMetadata().getRefName())) {
             return Mono.error(new AppsmithException(AppsmithError.INVALID_GIT_CONFIGURATION, GIT_CONFIG_ERROR));
         }
 
@@ -237,7 +238,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                 branchedArtifact.getWorkspaceId(), gitData.getDefaultArtifactId(), gitData.getRepoName());
 
         Mono<List<GitLogDTO>> commitHistoryMono = gitExecutor
-                .checkoutToBranch(baseRepoSuffix, gitData.getBranchName())
+                .checkoutToBranch(baseRepoSuffix, gitData.getRefName())
                 .onErrorResume(e ->
                         Mono.error(new AppsmithException(AppsmithError.GIT_ACTION_FAILED, "checkout", e.getMessage())))
                 .then(gitExecutor
@@ -271,7 +272,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
         GitArtifactMetadata branchedGitMetadata = branchedArtifact.getGitArtifactMetadata();
         branchedGitMetadata.setGitAuth(baseGitMetadata.getGitAuth());
 
-        final String finalBranchName = branchedGitMetadata.getBranchName();
+        final String finalBranchName = branchedGitMetadata.getRefName();
 
         if (StringUtils.isEmptyOrNull(finalBranchName)) {
             return Mono.error(new AppsmithException(AppsmithError.INVALID_PARAMETER, FieldName.BRANCH_NAME));
@@ -392,11 +393,11 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
 
         String baseArtifactId = baseGitData.getDefaultArtifactId();
 
-        if (branchedGitData == null || !hasText(branchedGitData.getBranchName())) {
+        if (branchedGitData == null || !hasText(branchedGitData.getRefName())) {
             return Mono.error(new AppsmithException(AppsmithError.INVALID_PARAMETER, BRANCH_NAME));
         }
 
-        final String finalBranchName = branchedArtifact.getGitArtifactMetadata().getBranchName();
+        final String finalBranchName = branchedArtifact.getGitArtifactMetadata().getRefName();
 
         GitArtifactHelper<?> artifactGitHelper = getArtifactGitService(baseArtifact.getArtifactType());
         Mono<User> currUserMono = sessionUserService.getCurrentUser().cache(); // will be used to send analytics event
@@ -515,7 +516,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                 "appId",
                 gitArtifactMetadata.getDefaultArtifactId(),
                 FieldName.BRANCH_NAME,
-                gitArtifactMetadata.getBranchName(),
+                gitArtifactMetadata.getRefName(),
                 "organizationId",
                 artifact.getWorkspaceId(),
                 "repoUrl",
@@ -722,7 +723,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                                     } else {
                                         GitArtifactMetadata gitArtifactMetadata = artifact.getGitArtifactMetadata();
                                         gitArtifactMetadata.setDefaultApplicationId(artifactId);
-                                        gitArtifactMetadata.setBranchName(defaultBranch);
+                                        gitArtifactMetadata.setRefName(defaultBranch);
                                         gitArtifactMetadata.setDefaultBranchName(defaultBranch);
                                         gitArtifactMetadata.setRemoteUrl(gitConnectDTO.getRemoteUrl());
                                         gitArtifactMetadata.setRepoName(repoName);
@@ -760,7 +761,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                 .flatMap(artifact -> {
                     String repoName = GitUtils.getRepoName(gitConnectDTO.getRemoteUrl());
                     Path readMePath = gitArtifactHelper.getRepoSuffixPath(
-                            artifact.getWorkspaceId(), baseArtifactId, repoName, "README.md");
+                            artifact.getWorkspaceId(), baseArtifactId, repoName, README_FILE_NAME);
                     try {
                         Mono<Path> readMeMono = gitArtifactHelper.intialiseReadMe(artifact, readMePath, originHeader);
                         return Mono.zip(readMeMono, currentUserMono)
@@ -925,7 +926,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
             return Mono.error(new AppsmithException(AppsmithError.INVALID_GIT_CONFIGURATION, GIT_CONFIG_ERROR));
         }
 
-        final String branchName = branchedGitMetadata.getBranchName();
+        final String branchName = branchedGitMetadata.getRefName();
 
         if (!hasText(branchName)) {
             return Mono.error(new AppsmithException(AppsmithError.INVALID_PARAMETER, FieldName.BRANCH_NAME));
@@ -988,7 +989,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                 })
                 .flatMap(artifact -> {
                     String errorEntity = "";
-                    if (StringUtils.isEmptyOrNull(branchedGitMetadata.getBranchName())) {
+                    if (StringUtils.isEmptyOrNull(branchedGitMetadata.getRefName())) {
                         errorEntity = "branch name";
                     } else if (StringUtils.isEmptyOrNull(branchedGitMetadata.getDefaultArtifactId())) {
                         // TODO: make this artifact
@@ -1191,7 +1192,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                     GitArtifactMetadata gitData = artifact.getGitArtifactMetadata();
 
                     if (gitData == null
-                            || StringUtils.isEmptyOrNull(gitData.getBranchName())
+                            || StringUtils.isEmptyOrNull(gitData.getRefName())
                             || StringUtils.isEmptyOrNull(gitData.getDefaultArtifactId())
                             || StringUtils.isEmptyOrNull(gitData.getGitAuth().getPrivateKey())) {
 
@@ -1206,14 +1207,14 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                     return gitExecutor
                             .checkoutToBranch(
                                     baseRepoSuffix,
-                                    artifact.getGitArtifactMetadata().getBranchName())
+                                    artifact.getGitArtifactMetadata().getRefName())
                             .then(Mono.defer(() -> gitExecutor
                                     .pushApplication(
                                             baseRepoSuffix,
                                             gitData.getRemoteUrl(),
                                             gitAuth.getPublicKey(),
                                             gitAuth.getPrivateKey(),
-                                            gitData.getBranchName())
+                                            gitData.getRefName())
                                     .zipWith(Mono.just(artifact))))
                             .onErrorResume(error -> addAnalyticsForGitOperation(
                                             AnalyticsEvents.GIT_PUSH,
@@ -1299,12 +1300,12 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                     artifact.getWorkspaceId(), gitMetadata.getDefaultArtifactId(), gitMetadata.getRepoName());
 
             return gitExecutor
-                    .resetHard(path, gitMetadata.getBranchName())
+                    .resetHard(path, gitMetadata.getRefName())
                     .then(Mono.error(new AppsmithException(
                             AppsmithError.GIT_ACTION_FAILED,
                             "push",
                             "Unable to push changes as pre-receive hook declined. Please make sure that you don't have any rules enabled on the branch "
-                                    + gitMetadata.getBranchName())));
+                                    + gitMetadata.getRefName())));
         }
         return Mono.just(pushResult);
     }
@@ -1415,7 +1416,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
 
         final String repoName = baseGitMetadata.getRepoName();
         final String baseArtifactId = baseGitMetadata.getDefaultArtifactId();
-        final String baseBranchName = baseGitMetadata.getBranchName();
+        final String baseBranchName = baseGitMetadata.getRefName();
         final String workspaceId = baseArtifact.getWorkspaceId();
         final String finalRemoteBranchName = remoteBranchName.replaceFirst(ORIGIN, REMOTE_NAME_REPLACEMENT);
 
@@ -1539,7 +1540,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                     Path repoSuffix = gitArtifactHelper.getRepoSuffixPath(
                             baseArtifact.getWorkspaceId(), baseGitMetadata.getDefaultArtifactId(), repoName);
 
-                    String baseApplicationBranchName = baseGitMetadata.getBranchName();
+                    String baseApplicationBranchName = baseGitMetadata.getRefName();
                     return Mono.zip(
                             gitExecutor.listBranches(repoSuffix),
                             Mono.just(baseArtifact),
@@ -1625,19 +1626,18 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
 
                     // Create a new branch from the parent checked out branch
                     return addFileLock(baseGitMetadata.getDefaultArtifactId(), GitCommandConstants.CREATE_BRANCH)
-                            .flatMap(status ->
-                                    gitExecutor.checkoutToBranch(repoSuffix, parentGitMetadata.getBranchName()))
+                            .flatMap(status -> gitExecutor.checkoutToBranch(repoSuffix, parentGitMetadata.getRefName()))
                             .onErrorResume(error -> Mono.error(new AppsmithException(
                                     AppsmithError.GIT_ACTION_FAILED,
                                     "checkout",
-                                    "Unable to find " + parentGitMetadata.getBranchName())))
+                                    "Unable to find " + parentGitMetadata.getRefName())))
                             .zipWhen(isCheckedOut -> gitExecutor
                                     .fetchRemote(
                                             repoSuffix,
                                             baseGitAuth.getPublicKey(),
                                             baseGitAuth.getPrivateKey(),
                                             false,
-                                            parentGitMetadata.getBranchName(),
+                                            parentGitMetadata.getRefName(),
                                             true)
                                     .onErrorResume(error -> Mono.error(
                                             new AppsmithException(AppsmithError.GIT_ACTION_FAILED, "fetch", error))))
@@ -1689,7 +1689,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                                 GitCommitDTO commitDTO = new GitCommitDTO();
                                 commitDTO.setCommitMessage(DEFAULT_COMMIT_MESSAGE
                                         + GitDefaultCommitMessage.BRANCH_CREATED.getReason()
-                                        + branchedGitMetadata.getBranchName());
+                                        + branchedGitMetadata.getRefName());
                                 commitDTO.setDoPush(true);
                                 return commitArtifact(
                                                 commitDTO, importedBranchedArtifact.getId(), false, false, artifactType)
@@ -1801,7 +1801,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
         final String workspaceId = branchedArtifact.getWorkspaceId();
         final String baseArtifactId = branchedGitMetadata.getDefaultArtifactId();
         final String repoName = branchedGitMetadata.getRepoName();
-        final String branchName = branchedGitMetadata.getBranchName();
+        final String branchName = branchedGitMetadata.getRefName();
 
         Path repoSuffix = gitArtifactHelper.getRepoSuffixPath(workspaceId, baseArtifactId, repoName);
 
@@ -2058,7 +2058,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
             Boolean isMergeable) {
 
         String branchName = artifact.getGitArtifactMetadata() != null
-                ? artifact.getGitArtifactMetadata().getBranchName()
+                ? artifact.getGitArtifactMetadata().getRefName()
                 : null;
         return addAnalyticsForGitOperation(
                 event, artifact, errorType, errorMessage, isRepoPrivate, isSystemGenerated, isMergeable, branchName);
@@ -2146,7 +2146,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
 
                     GitArtifactMetadata baseGitMetadata = baseArtifact.getGitArtifactMetadata();
                     GitArtifactMetadata branchedGitMetadata = branchedArtifact.getGitArtifactMetadata();
-                    final String finalBranchName = branchedGitMetadata.getBranchName();
+                    final String finalBranchName = branchedGitMetadata.getRefName();
 
                     return gitPrivateRepoHelper
                             .isBranchProtected(baseGitMetadata, finalBranchName)
@@ -2169,7 +2169,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
 
                     GitArtifactMetadata baseGitMetadata = baseArtifact.getGitArtifactMetadata();
                     GitArtifactMetadata branchedGitMetadata = branchedArtifact.getGitArtifactMetadata();
-                    final String finalBranchName = branchedGitMetadata.getBranchName();
+                    final String finalBranchName = branchedGitMetadata.getRefName();
 
                     Path repoPath = gitArtifactHelper.getRepoSuffixPath(
                             baseArtifact.getWorkspaceId(),
@@ -2186,13 +2186,17 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                             .onErrorResume(throwable -> {
                                 log.error("Delete branch failed {}", throwable.getMessage());
                                 if (throwable instanceof CannotDeleteCurrentBranchException) {
-                                    return Mono.error(new AppsmithException(
-                                            AppsmithError.GIT_ACTION_FAILED,
-                                            "delete branch",
-                                            "Cannot delete current checked out branch"));
+                                    return releaseFileLock(baseArtifactId)
+                                            .then(Mono.error(new AppsmithException(
+                                                    AppsmithError.GIT_ACTION_FAILED,
+                                                    "delete branch",
+                                                    "Cannot delete current checked out branch")));
                                 }
-                                return Mono.error(new AppsmithException(
-                                        AppsmithError.GIT_ACTION_FAILED, "delete branch", throwable.getMessage()));
+                                return releaseFileLock(baseArtifactId)
+                                        .then(Mono.error(new AppsmithException(
+                                                AppsmithError.GIT_ACTION_FAILED,
+                                                "delete branch",
+                                                throwable.getMessage())));
                             })
                             .flatMap(isBranchDeleted ->
                                     releaseFileLock(baseArtifactId).map(status -> isBranchDeleted))
@@ -2260,7 +2264,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                 })
                 .flatMap(branchedArtifact -> {
                     GitArtifactMetadata branchedGitData = branchedArtifact.getGitArtifactMetadata();
-                    final String branchName = branchedGitData.getBranchName();
+                    final String branchName = branchedGitData.getRefName();
                     final String defaultArtifactId = branchedGitData.getDefaultArtifactId();
                     final String repoName = branchedGitData.getRepoName();
                     final String workspaceId = branchedArtifact.getWorkspaceId();
@@ -2287,12 +2291,16 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                                     artifactExchangeJson,
                                     branchName))
                             // Update the last deployed status after the rebase
-                            .flatMap(importedArtifact -> publishArtifact(importedArtifact, true));
+                            .flatMap(importedArtifact ->
+                                    gitArtifactHelper.validateAndPublishArtifact(importedArtifact, true));
                 })
                 .flatMap(branchedArtifact -> releaseFileLock(
                                 branchedArtifact.getGitArtifactMetadata().getDefaultArtifactId())
                         .then(this.addAnalyticsForGitOperation(
                                 AnalyticsEvents.GIT_DISCARD_CHANGES, branchedArtifact, null)))
+                .onErrorResume(error -> branchedArtifactMonoCached.flatMap(branchedArtifact -> releaseFileLock(
+                                branchedArtifact.getGitArtifactMetadata().getDefaultArtifactId())
+                        .then(Mono.error(error))))
                 .name(GitSpan.OPS_DISCARD_CHANGES)
                 .tap(Micrometer.observation(observationRegistry));
 
@@ -2332,7 +2340,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
 
         Mono<? extends Artifact> destinationArtifactMono = baseAndBranchedArtifactsMono.flatMap(artifactTuples -> {
             Artifact baseArtifact = artifactTuples.getT1();
-            if (destinationBranch.equals(baseArtifact.getGitArtifactMetadata().getBranchName())) {
+            if (destinationBranch.equals(baseArtifact.getGitArtifactMetadata().getRefName())) {
                 return Mono.just(baseArtifact);
             }
 
@@ -2516,7 +2524,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
 
         Mono<? extends Artifact> destinationArtifactMono = baseAndBranchedArtifactsMono.flatMap(artifactTuples -> {
             Artifact baseArtifact = artifactTuples.getT1();
-            if (destinationBranch.equals(baseArtifact.getGitArtifactMetadata().getBranchName())) {
+            if (destinationBranch.equals(baseArtifact.getGitArtifactMetadata().getRefName())) {
                 return Mono.just(baseArtifact);
             }
 
@@ -2770,7 +2778,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                     final String workspaceId = baseArtifact.getWorkspaceId();
                     final String baseArtifactId = baseGitData.getDefaultArtifactId();
                     final String repoName = baseGitData.getRepoName();
-                    final String currentBranch = branchedGitData.getBranchName();
+                    final String currentBranch = branchedGitData.getRefName();
 
                     if (!hasText(baseArtifactId) || !hasText(repoName) || !hasText(currentBranch)) {
                         log.error(
@@ -2898,7 +2906,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                                 // remove origin/ prefix from the remote branch name
                                 String branchName = gitBranchDTO.getBranchName().replace("origin/", "");
                                 // The root defaultArtifact is always there, no need to check out it again
-                                if (!branchName.equals(gitArtifactMetadata.getBranchName())) {
+                                if (!branchName.equals(gitArtifactMetadata.getRefName())) {
                                     branchesToCheckout.add(branchName);
                                 }
                             } else if (gitBranchDTO
@@ -3255,7 +3263,7 @@ public class CommonGitServiceCEImpl implements CommonGitServiceCE {
                         GitArtifactMetadata gitArtifactMetadata = new GitArtifactMetadata();
                         gitArtifactMetadata.setGitAuth(gitAuth);
                         gitArtifactMetadata.setDefaultApplicationId(artifact.getId());
-                        gitArtifactMetadata.setBranchName(defaultBranch);
+                        gitArtifactMetadata.setRefName(defaultBranch);
                         gitArtifactMetadata.setDefaultBranchName(defaultBranch);
                         gitArtifactMetadata.setRemoteUrl(gitConnectDTO.getRemoteUrl());
                         gitArtifactMetadata.setRepoName(repoName);

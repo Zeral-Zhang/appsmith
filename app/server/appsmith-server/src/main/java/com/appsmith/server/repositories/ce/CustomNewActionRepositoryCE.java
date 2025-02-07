@@ -52,9 +52,6 @@ public interface CustomNewActionRepositoryCE extends AppsmithRepository<NewActio
 
     Optional<Long> countByDatasourceId(String datasourceId);
 
-    Optional<NewAction> findByBranchNameAndBaseActionId(
-            String branchName, String baseActionId, Boolean viewMode, AclPermission permission, User currentUser);
-
     List<NewAction> findByPageIds(List<String> pageIds, AclPermission permission, User currentUser);
 
     List<NewAction> findByPageIds(List<String> pageIds, Optional<AclPermission> permission, User currentUser);
@@ -90,4 +87,14 @@ public interface CustomNewActionRepositoryCE extends AppsmithRepository<NewActio
             boolean includeJs);
 
     List<NewAction> findAllByApplicationIds(List<String> branchedArtifactIds, List<String> includedFields);
+
+    // @Meta(cursorBatchSize = 10000)
+    // TODO Implement cursor with batch size
+    List<NewAction> findByApplicationId(String applicationId);
+
+    // @Meta(cursorBatchSize = 10000)
+    // TODO Implement cursor with batch size
+    List<NewAction> findAllByIdIn(Iterable<String> ids);
+
+    Optional<Long> countByDeletedAtNull();
 }

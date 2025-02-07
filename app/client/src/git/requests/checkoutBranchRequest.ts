@@ -1,4 +1,4 @@
-import type { AxiosResponse } from "axios";
+import type { AxiosPromise } from "axios";
 import type {
   CheckoutBranchRequestParams,
   CheckoutBranchResponse,
@@ -6,10 +6,10 @@ import type {
 import { GIT_BASE_URL } from "./constants";
 import Api from "api/Api";
 
-export default async function checkoutBranchRequest(
+export default async function checkoutBranchRequestOld(
   branchedApplicationId: string,
   params: CheckoutBranchRequestParams,
-): Promise<AxiosResponse<CheckoutBranchResponse>> {
+): AxiosPromise<CheckoutBranchResponse> {
   return Api.get(
     `${GIT_BASE_URL}/checkout-branch/app/${branchedApplicationId}`,
     params,

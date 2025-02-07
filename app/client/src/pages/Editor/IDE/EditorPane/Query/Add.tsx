@@ -1,38 +1,35 @@
 import React, { useState } from "react";
-import { Flex, SearchInput } from "@appsmith/ads";
+import {
+  EntityGroupsList,
+  Flex,
+  SearchInput,
+  NoSearchResults,
+  type FlexProps,
+  type ListItemProps,
+} from "@appsmith/ads";
 
 import { createMessage, EDITOR_PANE_TEXTS } from "ee/constants/messages";
 import SegmentAddHeader from "../components/SegmentAddHeader";
-import GroupedList from "../components/GroupedList";
 import {
-  useAddQueryListItems,
   useGroupedAddQueryOperations,
   useQueryAdd,
 } from "ee/pages/Editor/IDE/EditorPane/Query/hooks";
-import { EmptySearchResult } from "../components/EmptySearchResult";
 import { useSelector } from "react-redux";
 import { getIDEViewMode } from "selectors/ideSelectors";
-import type { FlexProps } from "@appsmith/ads";
 import { EditorViewMode } from "ee/entities/IDE/constants";
 import { filterEntityGroupsBySearchTerm } from "IDE/utils";
+import { DEFAULT_GROUP_LIST_SIZE } from "../../constants";
 
 const AddQuery = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const { getListItems } = useAddQueryListItems();
-  const groupedActionOperations = useGroupedAddQueryOperations();
+  const itemGroups = useGroupedAddQueryOperations();
   const { closeAddQuery } = useQueryAdd();
   const ideViewMode = useSelector(getIDEViewMode);
 
-  const itemGroups = groupedActionOperations.map((group) => ({
-    groupTitle: group.title,
-    className: group.className,
-    items: getListItems(group.operations),
-  }));
-
-  const filteredItemGroups = filterEntityGroupsBySearchTerm(
-    searchTerm,
-    itemGroups,
-  );
+  const filteredItemGroups = filterEntityGroupsBySearchTerm<
+    { groupTitle: string; className: string },
+    ListItemProps
+  >(searchTerm, itemGroups);
 
   const extraPadding: FlexProps =
     ideViewMode === EditorViewMode.FullScreen
@@ -63,11 +60,21 @@ const AddQuery = () => {
         />
         <SearchInput autoFocus onChange={setSearchTerm} value={searchTerm} />
         {filteredItemGroups.length > 0 ? (
-          <GroupedList groups={filteredItemGroups} />
+          <EntityGroupsList
+            flexProps={{
+              pb: "spaces-3",
+            }}
+            groups={filteredItemGroups}
+            showDivider
+            visibleItems={DEFAULT_GROUP_LIST_SIZE}
+          />
         ) : null}
         {filteredItemGroups.length === 0 && searchTerm !== "" ? (
-          <EmptySearchResult
-            type={createMessage(EDITOR_PANE_TEXTS.search_objects.datasources)}
+          <NoSearchResults
+            text={createMessage(
+              EDITOR_PANE_TEXTS.empty_search_result,
+              createMessage(EDITOR_PANE_TEXTS.search_objects.datasources),
+            )}
           />
         ) : null}
       </Flex>

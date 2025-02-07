@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.StreamSupport;
 
 import static com.appsmith.external.models.PluginType.getPluginTypes;
 
@@ -273,21 +274,6 @@ public class CustomNewActionRepositoryCEImpl extends BaseAppsmithRepositoryImpl<
     }
 
     @Override
-    public Optional<NewAction> findByBranchNameAndBaseActionId(
-            String branchName, String baseActionId, Boolean viewMode, AclPermission permission, User currentUser) {
-        final BridgeQuery<NewAction> q = Bridge.<NewAction>equal(NewAction.Fields.baseId, baseActionId)
-                .equal(NewAction.Fields.branchName, branchName);
-
-        if (Boolean.FALSE.equals(viewMode)) {
-            // In case an action has been deleted in edit mode, but still exists in deployed mode, NewAction object
-            // would exist. To handle this, only fetch non-deleted actions
-            q.isNull(NewAction.Fields.unpublishedAction_deletedAt);
-        }
-
-        return queryBuilder().criteria(q).permission(permission, currentUser).one();
-    }
-
-    @Override
     public List<NewAction> findByPageIds(List<String> pageIds, AclPermission permission, User currentUser) {
         return queryBuilder()
                 .criteria(Bridge.in(NewAction.Fields.unpublishedAction_pageId, pageIds))
@@ -484,5 +470,25 @@ public class CustomNewActionRepositoryCEImpl extends BaseAppsmithRepositoryImpl<
                 .criteria(Bridge.in(NewAction.Fields.applicationId, applicationIds))
                 .fields(includedFields)
                 .all();
+    }
+
+    @Override
+    public List<NewAction> findByApplicationId(String applicationId) {
+        return queryBuilder()
+                .criteria(Bridge.equal(NewAction.Fields.applicationId, applicationId))
+                .all();
+    }
+
+    @Override
+    public List<NewAction> findAllByIdIn(Iterable<String> ids) {
+        List<String> idList = StreamSupport.stream(ids.spliterator(), false).toList();
+        return queryBuilder().criteria(Bridge.in(NewAction.Fields.id, idList)).all();
+    }
+
+    @Override
+    public Optional<Long> countByDeletedAtNull() {
+        return queryBuilder()
+                .criteria(Bridge.exists(NewAction.Fields.deletedAt))
+                .count();
     }
 }

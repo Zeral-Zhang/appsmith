@@ -8,17 +8,16 @@ import type { UnEvalTree, ConfigTree } from "entities/DataTree/dataTreeTypes";
 import {
   ENTITY_TYPE,
   EvaluationSubstitutionType,
-} from "entities/DataTree/dataTreeFactory";
+} from "ee/entities/DataTree/types";
 import type { WidgetTypeConfigMap } from "WidgetProvider/factory";
 import { RenderModes } from "constants/WidgetConstants";
-import { PluginType } from "entities/Action";
+import { PluginType } from "entities/Plugin";
 import DataTreeEvaluator from "workers/common/DataTreeEvaluator";
 import { ValidationTypes } from "constants/WidgetValidation";
 import WidgetFactory from "WidgetProvider/factory";
 import { generateDataTreeWidget } from "entities/DataTree/dataTreeWidget";
 import { sortObjectWithArray } from "../../../utils/treeUtils";
 import klona from "klona";
-
 import { APP_MODE } from "entities/App";
 
 const klonaFullSpy = jest.fn();
