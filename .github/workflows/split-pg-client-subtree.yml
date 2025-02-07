@@ -1,10 +1,9 @@
 name: PG Client Subtree Split from Upstream
 
-# This workflow run every day at 8 AM, or you can adjust the schedule as needed.
 on:
   schedule:
-    - cron: '0 8 * * *'  # Run every day at 8 AM
-  workflow_dispatch:  # Allows you to trigger this workflow manually
+    - cron: '0 22 * * *'  # Runs at 10 PM UTC (6 AM Beijing Time)
+  workflow_dispatch:  # Allows manual execution
 
 jobs:
   split-subtree:
@@ -14,7 +13,8 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch the entire history
+          ref: pg  # Ensures the workflow always runs in the `pg` branch
+          fetch-depth: 0  # Fetch entire history to ensure correct subtree operations
 
       - name: Set up Git
         run: |
@@ -23,33 +23,46 @@ jobs:
 
       - name: Add upstream repository
         run: |
-          # Add the upstream repository (original repo you forked)
           git remote add upstream https://github.com/appsmithorg/appsmith.git
           git fetch upstream pg
 
-      - name: Check for updates in upstream main branch
+      - name: Sync upstream changes into local pg branch
         run: |
-          # Compare the upstream/main with your fork's main to check for new commits
-          UPSTREAM_COMMIT=$(git rev-parse upstream/pg)
+          git checkout pg
+          git merge --ff-only upstream/pg || { echo "Merge failed. Exiting."; exit 1; }
+          git push origin pg  # Ensure local pg is updated
+
+      - name: Check for new commits after merge
+        id: check_changes
+        run: |
           LOCAL_COMMIT=$(git rev-parse origin/pg)
-          if [ "$UPSTREAM_COMMIT" != "$LOCAL_COMMIT" ]; then
-            echo "Upstream repository has changed. Proceeding with subtree split."
+          UPSTREAM_COMMIT=$(git rev-parse upstream/pg)
+          if [ "$LOCAL_COMMIT" != "$UPSTREAM_COMMIT" ]; then
+            echo "New changes detected. Proceeding with subtree split."
+            echo "split_needed=true" >> $GITHUB_ENV
           else
-            echo "No changes in upstream. Exiting."
+            echo "No new changes. Exiting."
+            echo "split_needed=false" >> $GITHUB_ENV
             exit 0
           fi
 
-      - name: Fetch upstream changes
+      - name: Fetch pg-client branch (if exists)
         run: |
-          # Fetch the upstream branch to ensure it is up-to-date
-          git fetch upstream pg
+          git fetch origin pg-client || echo "pg-client branch does not exist, will create a new one"
 
-      - name: Perform subtree split
+      - name: Perform subtree split only for new commits
+        if: env.split_needed == 'true'
         run: |
-          # Split the app/client directory into a new branch
-          git subtree split --prefix=app/client -b pg-client --rejoin
+          # Generate the latest commit range
+          LAST_SPLIT_COMMIT=$(git log --pretty=format:"%H" -n 1 origin/pg-client -- app/client || echo "")
+          if [ -z "$LAST_SPLIT_COMMIT" ]; then
+            echo "No previous split found, performing full subtree split."
+            git subtree split --prefix=app/client -b pg-client --rejoin
+          else
+            echo "Performing subtree split for new commits only."
+            git subtree split --prefix=app/client --onto origin/pg-client pg -b pg-client --rejoin
+          fi
 
-      - name: Push the clien to origin
+      - name: Push the updated pg-client branch
         run: |
-          # Push the split branch to your forked repository
           git push origin pg-client --force
