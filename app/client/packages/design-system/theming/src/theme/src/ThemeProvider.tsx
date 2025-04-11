@@ -19,6 +19,7 @@ export const ThemeProvider = (props: ThemeProviderProps) => {
     colorModeClassName,
     fontFamilyClassName,
     providerClassName,
+    scrollbarWidthClassName,
     typographyClassName,
   } = useCssTokens(theme);
 
@@ -32,10 +33,16 @@ export const ThemeProvider = (props: ThemeProviderProps) => {
           fontFamilyClassName,
           providerClassName,
           typographyClassName,
+          scrollbarWidthClassName,
         )}
         data-theme-provider=""
         ref={providerRef}
-        style={style}
+        // Resetting the ADS OpenType features and type settings, so they don't leak into widgets, see https://github.com/appsmithorg/appsmith/blob/release/app/client/packages/design-system/ads/src/__theme__/default/index.css?plain=1#L310
+        style={{
+          ...style,
+          fontFeatureSettings: "'ss03' 0",
+          letterSpacing: "0",
+        }}
       >
         {children}
       </div>

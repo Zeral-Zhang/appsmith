@@ -37,11 +37,13 @@ import com.appsmith.server.exceptions.AppsmithException;
 import com.appsmith.server.helpers.CommonGitFileUtils;
 import com.appsmith.server.helpers.DSLMigrationUtils;
 import com.appsmith.server.helpers.GitUtils;
+import com.appsmith.server.helpers.LoadShifter;
 import com.appsmith.server.helpers.UserPermissionUtils;
 import com.appsmith.server.layouts.UpdateLayoutService;
 import com.appsmith.server.migrations.ApplicationVersion;
 import com.appsmith.server.newactions.base.NewActionService;
 import com.appsmith.server.newpages.base.NewPageService;
+import com.appsmith.server.postpublishhooks.base.PostPublishHookCoordinatorService;
 import com.appsmith.server.repositories.ActionCollectionRepository;
 import com.appsmith.server.repositories.ApplicationRepository;
 import com.appsmith.server.repositories.CacheableRepositoryHelper;
@@ -66,12 +68,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.minidev.json.JSONObject;
 import org.bson.types.ObjectId;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import org.springframework.util.StringUtils;
 import reactor.core.observability.micrometer.Micrometer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.context.Context;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
@@ -132,6 +137,8 @@ public class ApplicationPageServiceCEImpl implements ApplicationPageServiceCE {
     private final ObservationRegistry observationRegistry;
     private final CacheableRepositoryHelper cacheableRepositoryHelper;
 
+    private final PostPublishHookCoordinatorService<Application> postApplicationPublishHookCoordinatorService;
+
     @Override
     public Mono<PageDTO> createPage(PageDTO page) {
         if (page.getId() != null) {
@@ -158,8 +165,9 @@ public class ApplicationPageServiceCEImpl implements ApplicationPageServiceCE {
             }
         }
 
-        Mono<Application> applicationMono = applicationService
-                .findById(page.getApplicationId(), applicationPermission.getPageCreatePermission())
+        Mono<Application> applicationMono = applicationPermission
+                .getPageCreatePermission()
+                .flatMap(permission -> applicationService.findById(page.getApplicationId(), permission))
                 .switchIfEmpty(Mono.error(new AppsmithException(
                         AppsmithError.NO_RESOURCE_FOUND, FieldName.APPLICATION, page.getApplicationId())))
                 .cache();
@@ -475,8 +483,9 @@ public class ApplicationPageServiceCEImpl implements ApplicationPageServiceCE {
     @Override
     public Mono<Application> setApplicationPolicies(Mono<User> userMono, String workspaceId, Application application) {
         return userMono.flatMap(user -> {
-            Mono<Workspace> workspaceMono = workspaceRepository
-                    .findById(workspaceId, workspacePermission.getApplicationCreatePermission())
+            Mono<Workspace> workspaceMono = workspacePermission
+                    .getApplicationCreatePermission()
+                    .flatMap(permission -> workspaceRepository.findById(workspaceId, permission))
                     .switchIfEmpty(Mono.error(
                             new AppsmithException(AppsmithError.NO_RESOURCE_FOUND, FieldName.WORKSPACE, workspaceId)));
 
@@ -506,8 +515,9 @@ public class ApplicationPageServiceCEImpl implements ApplicationPageServiceCE {
     public Mono<Application> deleteApplication(String id) {
         log.debug("Archiving application with id: {}", id);
 
-        Mono<Application> applicationMono = applicationRepository
-                .findById(id, applicationPermission.getDeletePermission())
+        Mono<Application> applicationMono = applicationPermission
+                .getDeletePermission()
+                .flatMap(permission -> applicationRepository.findById(id, permission))
                 .switchIfEmpty(
                         Mono.error(new AppsmithException(AppsmithError.NO_RESOURCE_FOUND, FieldName.APPLICATION, id)))
                 .cache();
@@ -521,8 +531,10 @@ public class ApplicationPageServiceCEImpl implements ApplicationPageServiceCE {
                 .flatMapMany(application -> {
                     GitArtifactMetadata gitData = application.getGitApplicationMetadata();
                     if (GitUtils.isArtifactConnectedToGit(application.getGitArtifactMetadata())) {
-                        return applicationService.findAllApplicationsByBaseApplicationId(
-                                gitData.getDefaultArtifactId(), applicationPermission.getDeletePermission());
+                        return applicationPermission
+                                .getDeletePermission()
+                                .flatMapMany(permission -> applicationService.findAllApplicationsByBaseApplicationId(
+                                        gitData.getDefaultArtifactId(), permission));
                     }
                     return Flux.fromIterable(List.of(application));
                 })
@@ -554,12 +566,16 @@ public class ApplicationPageServiceCEImpl implements ApplicationPageServiceCE {
     }
 
     protected Mono<Application> deleteApplicationResources(Application application) {
-        return actionCollectionService
-                .archiveActionCollectionByApplicationId(application.getId(), actionPermission.getDeletePermission())
-                .then(newActionService.archiveActionsByApplicationId(
-                        application.getId(), actionPermission.getDeletePermission()))
-                .then(newPageService.archivePagesByApplicationId(
-                        application.getId(), pagePermission.getDeletePermission()))
+        Mono<AclPermission> actionPermissionMono =
+                actionPermission.getDeletePermission().cache();
+        Mono<AclPermission> pagePermissionMono = pagePermission.getDeletePermission();
+        return actionPermissionMono
+                .flatMap(actionDeletePermission -> actionCollectionService.archiveActionCollectionByApplicationId(
+                        application.getId(), actionDeletePermission))
+                .then(actionPermissionMono.flatMap(actionDeletePermission ->
+                        newActionService.archiveActionsByApplicationId(application.getId(), actionDeletePermission)))
+                .then(pagePermissionMono.flatMap(pageDeletePermission ->
+                        newPageService.archivePagesByApplicationId(application.getId(), pageDeletePermission)))
                 .then(themeService.archiveApplicationThemes(application))
                 .flatMap(applicationService::archive);
     }
@@ -904,12 +920,19 @@ public class ApplicationPageServiceCEImpl implements ApplicationPageServiceCE {
 
     @Override
     public Mono<PageDTO> deleteUnpublishedPage(String id) {
-        return deleteUnpublishedPageEx(
-                id,
-                pagePermission.getDeletePermission(),
-                applicationPermission.getReadPermission(),
-                actionPermission.getDeletePermission(),
-                actionPermission.getDeletePermission());
+        return pagePermission
+                .getDeletePermission()
+                .zipWith(actionPermission.getDeletePermission())
+                .flatMap(tuple -> {
+                    AclPermission pageDeletePermission = tuple.getT1();
+                    AclPermission actionDeletePermission = tuple.getT2();
+                    return deleteUnpublishedPageEx(
+                            id,
+                            pageDeletePermission,
+                            applicationPermission.getReadPermission(),
+                            actionDeletePermission,
+                            actionDeletePermission);
+                });
     }
 
     private Mono<PageDTO> deleteUnpublishedPageEx(
@@ -1021,9 +1044,17 @@ public class ApplicationPageServiceCEImpl implements ApplicationPageServiceCE {
      */
     @Override
     public Mono<Application> publishWithoutPermissionChecks(String applicationId, boolean isPublishedManually) {
+        Mono<SecurityContext> contextMono = ReactiveSecurityContextHolder.getContext();
+
         return publishAndGetMetadata(applicationId, isPublishedManually)
+                .zipWith(contextMono)
                 .flatMap(tuple2 -> {
-                    ApplicationPublishingMetaDTO metaDTO = tuple2.getT2();
+                    postApplicationPublishHookCoordinatorService
+                            .executePostPublishHooks(applicationId)
+                            .contextWrite(Context.of(SecurityContext.class, Mono.just(tuple2.getT2())))
+                            .subscribeOn(LoadShifter.elasticScheduler)
+                            .subscribe();
+                    ApplicationPublishingMetaDTO metaDTO = tuple2.getT1().getT2();
                     return sendApplicationPublishedEvent(metaDTO);
                 })
                 .elapsed()
@@ -1478,12 +1509,14 @@ public class ApplicationPageServiceCEImpl implements ApplicationPageServiceCE {
                             return datasourceRepository.setUserPermissionsInObject(datasource);
                         }));
 
-        return UserPermissionUtils.validateDomainObjectPermissionsOrError(
+        return datasourcePermission
+                .getActionCreatePermission()
+                .flatMap(actionCreatePermission -> UserPermissionUtils.validateDomainObjectPermissionsOrError(
                         datasourceFlux,
                         FieldName.DATASOURCE,
                         permissionGroupService.getSessionUserPermissionGroupIds(),
-                        datasourcePermission.getActionCreatePermission(),
-                        AppsmithError.APPLICATION_NOT_CLONED_MISSING_PERMISSIONS)
+                        actionCreatePermission,
+                        AppsmithError.APPLICATION_NOT_CLONED_MISSING_PERMISSIONS))
                 .thenReturn(Boolean.TRUE);
     }
 }

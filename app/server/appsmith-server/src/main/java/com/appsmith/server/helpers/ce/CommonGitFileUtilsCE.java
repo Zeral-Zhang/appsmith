@@ -1,6 +1,7 @@
 package com.appsmith.server.helpers.ce;
 
 import com.appsmith.external.constants.AnalyticsEvents;
+import com.appsmith.external.enums.FeatureFlagEnum;
 import com.appsmith.external.git.FileInterface;
 import com.appsmith.external.git.models.GitResourceIdentity;
 import com.appsmith.external.git.models.GitResourceMap;
@@ -14,6 +15,7 @@ import com.appsmith.external.models.BaseDomain;
 import com.appsmith.external.models.CreatorContextType;
 import com.appsmith.external.models.DatasourceStorage;
 import com.appsmith.external.models.PluginType;
+import com.appsmith.git.configurations.GitServiceConfig;
 import com.appsmith.git.constants.CommonConstants;
 import com.appsmith.git.files.FileUtilsImpl;
 import com.appsmith.server.actioncollections.base.ActionCollectionService;
@@ -35,6 +37,7 @@ import com.appsmith.server.helpers.ArtifactGitFileUtils;
 import com.appsmith.server.migrations.JsonSchemaVersions;
 import com.appsmith.server.newactions.base.NewActionService;
 import com.appsmith.server.services.AnalyticsService;
+import com.appsmith.server.services.FeatureFlagService;
 import com.appsmith.server.services.SessionUserService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.MapperFeature;
@@ -53,6 +56,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -62,6 +66,7 @@ import java.util.Set;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
+import static com.appsmith.external.git.constants.ce.GitConstantsCE.ARTIFACT_JSON_TYPE;
 import static com.appsmith.external.git.constants.ce.GitConstantsCE.GitCommandConstantsCE.CHECKOUT_BRANCH;
 import static com.appsmith.external.git.constants.ce.GitConstantsCE.RECONSTRUCT_PAGE;
 import static com.appsmith.git.constants.CommonConstants.CLIENT_SCHEMA_VERSION;
@@ -79,6 +84,7 @@ import static com.appsmith.git.constants.ce.GitDirectoriesCE.DATASOURCE_DIRECTOR
 import static com.appsmith.git.constants.ce.GitDirectoriesCE.JS_LIB_DIRECTORY;
 import static com.appsmith.git.constants.ce.GitDirectoriesCE.PAGE_DIRECTORY;
 import static com.appsmith.git.files.FileUtilsCEImpl.getJsLibFileName;
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
@@ -87,6 +93,7 @@ import static org.springframework.util.StringUtils.hasText;
 public class CommonGitFileUtilsCE {
 
     protected final ArtifactGitFileUtils<ApplicationJson> applicationGitFileUtils;
+    protected final GitServiceConfig gitServiceConfig;
     private final FileInterface fileUtils;
     private final FileOperations fileOperations;
     private final AnalyticsService analyticsService;
@@ -94,16 +101,17 @@ public class CommonGitFileUtilsCE {
 
     private final NewActionService newActionService;
     private final ActionCollectionService actionCollectionService;
-
     // Number of seconds after lock file is stale
     @Value("${appsmith.index.lock.file.time}")
     public final int INDEX_LOCK_FILE_STALE_TIME = 300;
 
     private final JsonSchemaVersions jsonSchemaVersions;
     protected final ObjectMapper objectMapper;
+    private final FeatureFlagService featureFlagService;
 
     public CommonGitFileUtilsCE(
             ArtifactGitFileUtils<ApplicationJson> applicationGitFileUtils,
+            GitServiceConfig gitServiceConfig,
             FileInterface fileUtils,
             FileOperations fileOperations,
             AnalyticsService analyticsService,
@@ -111,8 +119,10 @@ public class CommonGitFileUtilsCE {
             NewActionService newActionService,
             ActionCollectionService actionCollectionService,
             JsonSchemaVersions jsonSchemaVersions,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            FeatureFlagService featureFlagService) {
         this.applicationGitFileUtils = applicationGitFileUtils;
+        this.gitServiceConfig = gitServiceConfig;
         this.fileUtils = fileUtils;
         this.fileOperations = fileOperations;
         this.analyticsService = analyticsService;
@@ -121,6 +131,7 @@ public class CommonGitFileUtilsCE {
         this.actionCollectionService = actionCollectionService;
         this.jsonSchemaVersions = jsonSchemaVersions;
         this.objectMapper = objectMapper.copy().disable(MapperFeature.USE_ANNOTATIONS);
+        this.featureFlagService = featureFlagService;
     }
 
     protected ArtifactGitFileUtils<?> getArtifactBasedFileHelper(ArtifactType artifactType) {
@@ -136,9 +147,9 @@ public class CommonGitFileUtilsCE {
      * This method will save the complete application in the local repo directory.
      * Path to repo will be : ./container-volumes/git-repo/workspaceId/defaultApplicationId/repoName/{application_data}
      *
-     * @param baseRepoSuffix  path suffix used to create a local repo path
+     * @param baseRepoSuffix       path suffix used to create a local repo path
      * @param artifactExchangeJson application reference object from which entire application can be rehydrated
-     * @param branchName      name of the branch for the current application
+     * @param branchName           name of the branch for the current application
      * @return repo path where the application is stored
      */
     public Mono<Path> saveArtifactToLocalRepo(
@@ -147,16 +158,19 @@ public class CommonGitFileUtilsCE {
 
         // this should come from the specific files
         ArtifactGitReference artifactGitReference = createArtifactReference(artifactExchangeJson);
+        Mono<Boolean> isRtsResetEnabledMono = featureFlagService.check(FeatureFlagEnum.ab_rts_git_reset_enabled);
 
         // Save application to git repo
-        try {
-            return fileUtils
-                    .saveApplicationToGitRepo(baseRepoSuffix, artifactGitReference, branchName)
-                    .subscribeOn(Schedulers.boundedElastic());
-        } catch (IOException | GitAPIException e) {
-            log.error("Error occurred while saving files to local git repo: ", e);
-            throw Exceptions.propagate(e);
-        }
+        return isRtsResetEnabledMono
+                .flatMap(isRtsEnabled -> {
+                    try {
+                        return fileUtils.saveApplicationToGitRepo(
+                                baseRepoSuffix, artifactGitReference, branchName, isRtsEnabled);
+                    } catch (IOException | GitAPIException e) {
+                        throw Exceptions.propagate(e);
+                    }
+                })
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     public Mono<Path> saveArtifactToLocalRepoNew(
@@ -164,15 +178,19 @@ public class CommonGitFileUtilsCE {
 
         // this should come from the specific files
         GitResourceMap gitResourceMap = createGitResourceMap(artifactExchangeJson);
+        Mono<Boolean> keepWorkingDirChangesMono =
+                featureFlagService.check(FeatureFlagEnum.release_git_reset_optimization_enabled);
 
         // Save application to git repo
-        try {
-            return fileUtils
-                    .saveArtifactToGitRepo(baseRepoSuffix, gitResourceMap, branchName)
-                    .subscribeOn(Schedulers.boundedElastic());
-        } catch (IOException | GitAPIException exception) {
-            return Mono.error(exception);
-        }
+        return keepWorkingDirChangesMono.flatMap(keepWorkingDirChanges -> {
+            try {
+                return fileUtils
+                        .saveArtifactToGitRepo(baseRepoSuffix, gitResourceMap, branchName, keepWorkingDirChanges)
+                        .subscribeOn(Schedulers.boundedElastic());
+            } catch (IOException | GitAPIException exception) {
+                return Mono.error(exception);
+            }
+        });
     }
 
     public Mono<Path> saveArtifactToLocalRepoWithAnalytics(
@@ -327,9 +345,8 @@ public class CommonGitFileUtilsCE {
                         && newAction.getUnpublishedAction().getDeletedAt() == null)
                 .peek(newAction -> newActionService.generateActionByViewMode(newAction, false))
                 .forEach(newAction -> {
-                    removeUnwantedFieldFromAction(newAction);
                     ActionDTO action = newAction.getUnpublishedAction();
-                    final String actionFileName = action.getValidName().replace(".", "-");
+                    final String actionFileName = action.getUserExecutableName().replace(".", "-");
                     final String filePathPrefix = getContextDirectoryByType(action.getContextType())
                             + DELIMITER_PATH
                             + action.calculateContextId()
@@ -366,6 +383,8 @@ public class CommonGitFileUtilsCE {
                                 new GitResourceIdentity(GitResourceType.QUERY_DATA, newAction.getGitSyncId(), filePath);
                         resourceMap.put(actionDataIdentity, body);
                     }
+
+                    removeUnwantedFieldFromAction(newAction);
                     final String filePath = filePathPrefix + METADATA + JSON_EXTENSION;
                     GitResourceIdentity actionConfigIdentity =
                             new GitResourceIdentity(GitResourceType.QUERY_CONFIG, newAction.getGitSyncId(), filePath);
@@ -386,26 +405,27 @@ public class CommonGitFileUtilsCE {
                 .peek(actionCollection ->
                         actionCollectionService.generateActionCollectionByViewMode(actionCollection, false))
                 .forEach(actionCollection -> {
-                    removeUnwantedFieldFromActionCollection(actionCollection);
                     ActionCollectionDTO collection = actionCollection.getUnpublishedCollection();
+                    final String collectionName = collection.getUserExecutableName();
                     final String filePathPrefix = getContextDirectoryByType(collection.getContextType())
                             + DELIMITER_PATH
                             + collection.calculateContextId()
                             + DELIMITER_PATH
                             + ACTION_COLLECTION_DIRECTORY
                             + DELIMITER_PATH
-                            + collection.getName()
+                            + collectionName
                             + DELIMITER_PATH;
                     String body = collection.getBody();
                     collection.setBody(null);
 
+                    removeUnwantedFieldFromActionCollection(actionCollection);
                     String configFilePath = filePathPrefix + METADATA + JSON_EXTENSION;
                     GitResourceIdentity collectionConfigIdentity = new GitResourceIdentity(
                             GitResourceType.JSOBJECT_CONFIG, actionCollection.getGitSyncId(), configFilePath);
                     resourceMap.put(collectionConfigIdentity, actionCollection);
 
                     if (body != null) {
-                        String dataFilePath = filePathPrefix + collection.getName() + JS_EXTENSION;
+                        String dataFilePath = filePathPrefix + collectionName + JS_EXTENSION;
                         GitResourceIdentity collectionDataIdentity = new GitResourceIdentity(
                                 GitResourceType.JSOBJECT_DATA, actionCollection.getGitSyncId(), dataFilePath);
                         resourceMap.put(collectionDataIdentity, body);
@@ -655,9 +675,9 @@ public class CommonGitFileUtilsCE {
     /**
      * Method to reconstruct the application from the local git repo
      *
-     * @param workspaceId       To which workspace application needs to be rehydrated
+     * @param workspaceId    To which workspace application needs to be rehydrated
      * @param baseArtifactId Root application for the current branched application
-     * @param branchName        for which branch the application needs to rehydrate
+     * @param branchName     for which branch the application needs to rehydrate
      * @param artifactType
      * @return application reference from which entire application can be rehydrated
      */
@@ -777,6 +797,67 @@ public class CommonGitFileUtilsCE {
                     metadataMap.put(FILE_FORMAT_VERSION, fileFormatVersion);
                     return metadataMap;
                 });
+    }
+
+    public Mono<Path> moveRepositoryFromTemporaryStorage(Path temporaryPath, Path absoluteArtifactPath) {
+
+        Path currentGitPath = Path.of(gitServiceConfig.getGitRootPath()).resolve(temporaryPath);
+        Path targetPath = Path.of(gitServiceConfig.getGitRootPath()).resolve(absoluteArtifactPath);
+
+        return Mono.fromCallable(() -> {
+                    try {
+                        if (!Files.exists(targetPath)) {
+                            Files.createDirectories(targetPath);
+                        }
+
+                        return Files.move(currentGitPath, targetPath, REPLACE_EXISTING);
+
+                    } catch (IOException exception) {
+                        log.error("File IO exception while moving repository. {}", exception.getMessage());
+                        throw new AppsmithException(AppsmithError.GIT_FILE_SYSTEM_ERROR, exception.getMessage());
+                    }
+                })
+                .onErrorResume(error -> {
+                    log.error(
+                            "Error while moving repository from temporary storage {} to permanent storage {}",
+                            currentGitPath,
+                            targetPath,
+                            error.getMessage());
+                    return Mono.error(error);
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    public Mono<ArtifactType> getArtifactJsonTypeOfRepository(Path repoSuffix) {
+        Mono<ArtifactType> artifactTypeMono = fileUtils
+                .reconstructMetadataFromGitRepository(repoSuffix)
+                .flatMap(metadata -> {
+                    Gson gson = new Gson();
+                    JsonObject metadataJsonObject =
+                            gson.toJsonTree(metadata, Object.class).getAsJsonObject();
+
+                    if (metadataJsonObject == null) {
+                        log.error(
+                                "Error in retrieving the metadata from the file system for repository {}", repoSuffix);
+                        return Mono.error(new AppsmithException(AppsmithError.GIT_FILE_SYSTEM_ERROR));
+                    }
+
+                    JsonElement artifactJsonType = metadataJsonObject.get(ARTIFACT_JSON_TYPE);
+
+                    if (artifactJsonType == null) {
+                        log.error(
+                                "artifactJsonType attribute not found in the metadata file for repository {}",
+                                repoSuffix);
+                        return Mono.error(new AppsmithException(AppsmithError.GIT_FILE_SYSTEM_ERROR));
+                    }
+
+                    return Mono.just(artifactJsonType.getAsString());
+                })
+                .flatMap(artifactJsonType -> {
+                    return Mono.justOrEmpty(ArtifactType.valueOf(artifactJsonType));
+                });
+
+        return Mono.create(sink -> artifactTypeMono.subscribe(sink::success, sink::error, null, sink.currentContext()));
     }
 
     /**

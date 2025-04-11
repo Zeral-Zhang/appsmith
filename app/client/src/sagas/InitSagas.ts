@@ -66,7 +66,7 @@ import { getDebuggerErrors } from "selectors/debuggerSelectors";
 import { deleteErrorLog } from "actions/debuggerActions";
 import { getCurrentUser } from "actions/authActions";
 
-import { getCurrentTenant } from "ee/actions/tenantActions";
+import { getCurrentOrganization } from "ee/actions/organizationActions";
 import {
   fetchFeatureFlagsInit,
   fetchProductAlertInit,
@@ -92,6 +92,7 @@ import {
 import type { ApplicationPayload } from "entities/Application";
 import type { Page } from "entities/Page";
 import type { PACKAGE_PULL_STATUS } from "ee/constants/ModuleConstants";
+import { validateSessionToken } from "utils/SessionUtils";
 
 export const URL_CHANGE_ACTIONS = [
   ReduxActionTypes.CURRENT_APPLICATION_NAME_UPDATE,
@@ -106,7 +107,7 @@ export interface ReduxURLChangeAction {
 
 export interface DeployConsolidatedApi {
   productAlert: ApiResponse<ProductAlert>;
-  tenantConfig: ApiResponse;
+  organizationConfig: ApiResponse;
   featureFlags: ApiResponse<FeatureFlags>;
   userProfile: ApiResponse;
   pages: FetchApplicationResponse;
@@ -120,7 +121,7 @@ export interface DeployConsolidatedApi {
 
 export interface EditConsolidatedApi {
   productAlert: ApiResponse<ProductAlert>;
-  tenantConfig: ApiResponse;
+  organizationConfig: ApiResponse;
   featureFlags: ApiResponse<FeatureFlags>;
   userProfile: ApiResponse;
   pages: FetchApplicationResponse;
@@ -285,8 +286,13 @@ export function* getInitResponses({
     throw new PageNotFoundError(`Cannot find page with base id: ${basePageId}`);
   }
 
-  const { featureFlags, productAlert, tenantConfig, userProfile, ...rest } =
-    response || {};
+  const {
+    featureFlags,
+    organizationConfig,
+    productAlert,
+    userProfile,
+    ...rest
+  } = response || {};
   //actions originating from INITIALIZE_CURRENT_PAGE should update user details
   //other actions are not necessary
 
@@ -298,7 +304,7 @@ export function* getInitResponses({
 
   yield put(fetchFeatureFlagsInit(featureFlags));
 
-  yield put(getCurrentTenant(false, tenantConfig));
+  yield put(getCurrentOrganization(false, organizationConfig));
 
   yield put(fetchProductAlertInit(productAlert));
   yield call(
@@ -457,6 +463,15 @@ function* appEngineSaga(action: ReduxAction<AppEnginePayload>) {
 }
 
 function* eagerPageInitSaga() {
+  try {
+    // Validate session token if present
+    yield call(validateSessionToken);
+  } catch (error) {
+    // Log error but don't block the rest of the initialization
+    log.error("Error validating session token:", error);
+    Sentry.captureException(error);
+  }
+
   const url = window.location.pathname;
   const search = window.location.search;
 

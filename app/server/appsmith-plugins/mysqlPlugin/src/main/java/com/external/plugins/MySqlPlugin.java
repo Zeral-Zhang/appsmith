@@ -1,5 +1,6 @@
 package com.external.plugins;
 
+import com.appsmith.external.configurations.connectionpool.ConnectionPoolConfig;
 import com.appsmith.external.datatypes.AppsmithType;
 import com.appsmith.external.dtos.ExecuteActionDTO;
 import com.appsmith.external.exceptions.pluginExceptions.AppsmithPluginError;
@@ -34,6 +35,7 @@ import com.external.plugins.exceptions.MySQLPluginError;
 import com.external.utils.MySqlDatasourceUtils;
 import com.external.utils.MySqlErrorUtils;
 import com.external.utils.QueryUtils;
+import io.micrometer.observation.ObservationRegistry;
 import io.r2dbc.pool.ConnectionPool;
 import io.r2dbc.pool.PoolMetrics;
 import io.r2dbc.spi.Connection;
@@ -52,6 +54,7 @@ import org.mariadb.r2dbc.message.server.ColumnDefinitionPacket;
 import org.pf4j.Extension;
 import org.pf4j.PluginWrapper;
 import org.springframework.util.StringUtils;
+import reactor.core.observability.micrometer.Micrometer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
@@ -71,6 +74,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.IntStream;
 
 import static com.appsmith.external.constants.ActionConstants.ACTION_CONFIGURATION_BODY;
+import static com.appsmith.external.constants.spans.ce.ActionSpanCE.CREATE_AND_EXECUTE_QUERY_FROM_CONNECTION;
+import static com.appsmith.external.constants.spans.ce.ActionSpanCE.PLUGIN_EXECUTE_COMMON;
 import static com.appsmith.external.helpers.PluginUtils.MATCH_QUOTED_WORDS_REGEX;
 import static com.appsmith.external.helpers.PluginUtils.getIdenticalColumns;
 import static com.appsmith.external.helpers.PluginUtils.getPSParamLabel;
@@ -161,6 +166,14 @@ public class MySqlPlugin extends BasePlugin {
 
         private static final int PREPARED_STATEMENT_INDEX = 0;
         private final Scheduler scheduler = Schedulers.boundedElastic();
+        private final ConnectionPoolConfig connectionPoolConfig;
+
+        private final ObservationRegistry observationRegistry;
+
+        public MySqlPluginExecutor(ConnectionPoolConfig connectionPoolConfig, ObservationRegistry observationRegistry) {
+            this.connectionPoolConfig = connectionPoolConfig;
+            this.observationRegistry = observationRegistry;
+        }
 
         /**
          * Instead of using the default executeParametrized provided by pluginExecutor, this implementation affords an opportunity
@@ -226,7 +239,10 @@ public class MySqlPlugin extends BasePlugin {
             // In case of non prepared statement, simply do binding replacement and execute
             if (FALSE.equals(isPreparedStatement)) {
                 prepareConfigurationsForExecution(executeActionDTO, actionConfiguration, datasourceConfiguration);
-                return executeCommon(connectionContext, actionConfiguration, FALSE, null, null, requestData);
+                return executeCommon(connectionContext, actionConfiguration, FALSE, null, null, requestData)
+                        .tag("plugin", this.getClass().getName())
+                        .name(PLUGIN_EXECUTE_COMMON)
+                        .tap(Micrometer.observation(observationRegistry));
             }
 
             // This has to be executed as prepared statement
@@ -237,7 +253,15 @@ public class MySqlPlugin extends BasePlugin {
             // Set the query with bindings extracted and replaced with '?' back in config
             actionConfiguration.setBody(updatedQuery);
             return executeCommon(
-                    connectionContext, actionConfiguration, TRUE, mustacheKeysInOrder, executeActionDTO, requestData);
+                            connectionContext,
+                            actionConfiguration,
+                            TRUE,
+                            mustacheKeysInOrder,
+                            executeActionDTO,
+                            requestData)
+                    .tag("plugin", this.getClass().getName())
+                    .name(PLUGIN_EXECUTE_COMMON)
+                    .tap(Micrometer.observation(observationRegistry));
         }
 
         @Override
@@ -335,13 +359,18 @@ public class MySqlPlugin extends BasePlugin {
                                         .flatMapMany(isValid -> {
                                             if (isValid) {
                                                 return createAndExecuteQueryFromConnection(
-                                                        finalQuery,
-                                                        connection,
-                                                        preparedStatement,
-                                                        mustacheValuesInOrder,
-                                                        executeActionDTO,
-                                                        requestData,
-                                                        psParams);
+                                                                finalQuery,
+                                                                connection,
+                                                                preparedStatement,
+                                                                mustacheValuesInOrder,
+                                                                executeActionDTO,
+                                                                requestData,
+                                                                psParams)
+                                                        .tag(
+                                                                "plugin",
+                                                                this.getClass().getName())
+                                                        .name(CREATE_AND_EXECUTE_QUERY_FROM_CONNECTION)
+                                                        .tap(Micrometer.observation(observationRegistry));
                                             }
                                             return Flux.error(new StaleConnectionException(
                                                     CONNECTION_VALIDITY_CHECK_FAILED_ERROR_MSG));
@@ -668,9 +697,12 @@ public class MySqlPlugin extends BasePlugin {
                 try {
                     connectionContext = getConnectionContext(
                             datasourceConfiguration, CONNECTION_METHOD_INDEX, MYSQL_DEFAULT_PORT, ConnectionPool.class);
-                    ConnectionPool pool = getNewConnectionPool(datasourceConfiguration, connectionContext);
-                    connectionContext.setConnection(pool);
-                    return Mono.just(connectionContext);
+                    return connectionPoolConfig.getMaxConnectionPoolSize().flatMap(maxPoolSize -> {
+                        ConnectionPool pool =
+                                getNewConnectionPool(datasourceConfiguration, connectionContext, maxPoolSize);
+                        connectionContext.setConnection(pool);
+                        return Mono.just(connectionContext);
+                    });
                 } catch (AppsmithPluginException e) {
                     return Mono.error(e);
                 }

@@ -280,13 +280,16 @@ public class ActionCollectionServiceCEImpl extends BaseService<ActionCollectionR
 
     @Override
     public Mono<ActionCollectionDTO> deleteWithoutPermissionUnpublishedActionCollection(String id) {
-        return deleteUnpublishedActionCollection(id, null, actionPermission.getDeletePermission());
+        return actionPermission
+                .getDeletePermission()
+                .flatMap(permission -> deleteUnpublishedActionCollection(id, null, permission));
     }
 
     @Override
     public Mono<ActionCollectionDTO> deleteUnpublishedActionCollection(String id) {
-        return deleteUnpublishedActionCollection(
-                id, actionPermission.getDeletePermission(), actionPermission.getDeletePermission());
+        return actionPermission
+                .getDeletePermission()
+                .flatMap(permission -> deleteUnpublishedActionCollection(id, permission, permission));
     }
 
     @Override
@@ -418,10 +421,12 @@ public class ActionCollectionServiceCEImpl extends BaseService<ActionCollectionR
     }
 
     protected Mono<ActionCollection> archiveGivenActionCollection(ActionCollection actionCollection) {
-        Flux<NewAction> unpublishedJsActionsFlux = newActionService.findByCollectionIdAndViewMode(
-                actionCollection.getId(), false, actionPermission.getDeletePermission());
-        Flux<NewAction> publishedJsActionsFlux = newActionService.findByCollectionIdAndViewMode(
-                actionCollection.getId(), true, actionPermission.getDeletePermission());
+        Mono<AclPermission> deleteActionPermissionMono =
+                actionPermission.getDeletePermission().cache();
+        Flux<NewAction> unpublishedJsActionsFlux = deleteActionPermissionMono.flatMapMany(permission ->
+                newActionService.findByCollectionIdAndViewMode(actionCollection.getId(), false, permission));
+        Flux<NewAction> publishedJsActionsFlux = deleteActionPermissionMono.flatMapMany(permission ->
+                newActionService.findByCollectionIdAndViewMode(actionCollection.getId(), true, permission));
         return unpublishedJsActionsFlux
                 .mergeWith(publishedJsActionsFlux)
                 .flatMap(toArchive -> newActionService
@@ -436,6 +441,12 @@ public class ActionCollectionServiceCEImpl extends BaseService<ActionCollectionR
                             return Mono.empty();
                         }))
                 .collectList()
+                .flatMap(newActions -> {
+                    List<ActionDTO> actionDTOs = newActions.stream()
+                            .map(x -> newActionService.generateActionByViewMode(x, false))
+                            .toList();
+                    return newActionService.postProcessDeletedActions(actionDTOs);
+                })
                 .then(repository.archive(actionCollection).thenReturn(actionCollection))
                 .flatMap(deletedActionCollection -> analyticsService.sendDeleteEvent(
                         deletedActionCollection, getAnalyticsProperties(deletedActionCollection)));
@@ -526,13 +537,15 @@ public class ActionCollectionServiceCEImpl extends BaseService<ActionCollectionR
     public Mono<ActionCollectionDTO> validateAndSaveCollection(ActionCollection actionCollection) {
         ActionCollectionDTO collectionDTO = actionCollection.getUnpublishedCollection();
 
+        List<ActionDTO> newlyAddedActions = new ArrayList<>();
+
         return validateActionCollection(actionCollection)
                 .thenReturn(collectionDTO.getActions())
                 .defaultIfEmpty(List.of())
                 .flatMapMany(Flux::fromIterable)
                 .flatMap(action -> {
                     if (action.getId() == null) {
-                        return createJsAction(actionCollection, action);
+                        return createJsAction(actionCollection, action).doOnNext(newlyAddedActions::add);
                     }
                     // This would occur when the new collection is created by grouping existing actions
                     // This could be a future enhancement for js editor templates,
@@ -541,6 +554,9 @@ public class ActionCollectionServiceCEImpl extends BaseService<ActionCollectionR
                     return Mono.just(action);
                 })
                 .collectList()
+                .flatMap(actions -> newActionService
+                        .postProcessNewlyAddedActions(newlyAddedActions)
+                        .thenReturn(actions))
                 .flatMap(actions -> {
                     // Create collection and return with actions
                     final Mono<ActionCollection> actionCollectionMono = this.create(actionCollection)

@@ -1,6 +1,6 @@
-import React, { lazy, Suspense } from "react";
 import log from "loglevel";
 import memoizeOne from "memoize-one";
+import React, { lazy, Suspense } from "react";
 
 import _, {
   filter,
@@ -19,16 +19,61 @@ import _, {
   xorWith,
 } from "lodash";
 
-import type { WidgetProps, WidgetState } from "widgets/BaseWidget";
-import BaseWidget from "widgets/BaseWidget";
+import type { IconName } from "@blueprintjs/icons";
+import { IconNames } from "@blueprintjs/icons";
+import type { BatchPropertyUpdatePayload } from "actions/controlActions";
+import Skeleton from "components/utils/Skeleton";
+import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
+import { Colors } from "constants/Colors";
+import { FILL_WIDGET_MIN_WIDTH } from "constants/minWidthConstants";
 import {
   RenderModes,
   WIDGET_PADDING,
   WIDGET_TAGS,
 } from "constants/WidgetConstants";
-import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
-import Skeleton from "components/utils/Skeleton";
+import type { SetterConfig, Stylesheet } from "entities/AppTheming";
+import equal from "fast-deep-equal/es6";
+import {
+  FlexVerticalAlignment,
+  ResponsiveBehavior,
+} from "layoutSystems/common/utils/constants";
 import { noop, retryPromise } from "utils/AppsmithUtils";
+import type { ExtraDef } from "utils/autocomplete/defCreatorUtils";
+import { generateTypeDef } from "utils/autocomplete/defCreatorUtils";
+import type { DynamicPath } from "utils/DynamicBindingUtils";
+import { klonaRegularWithTelemetry } from "utils/helpers";
+import localStorage from "utils/localStorage";
+import type {
+  AnvilConfig,
+  AutocompletionDefinitions,
+  PropertyUpdates,
+  SnipingModeProperty,
+} from "WidgetProvider/constants";
+import type {
+  WidgetQueryConfig,
+  WidgetQueryGenerationFormConfig,
+} from "WidgetQueryGenerators/types";
+import type { WidgetProps, WidgetState } from "widgets/BaseWidget";
+import BaseWidget from "widgets/BaseWidget";
+import { TimePrecision } from "widgets/DatePickerWidget2/constants";
+import type { MenuItem } from "widgets/MenuButtonWidget/constants";
+import { MenuItemsSource } from "widgets/MenuButtonWidget/constants";
+import {
+  DefaultAutocompleteDefinitions,
+  sanitizeKey,
+} from "widgets/WidgetUtils";
+import { ButtonCell } from "../component/cellComponents/ButtonCell";
+import { CheckboxCell } from "../component/cellComponents/CheckboxCell";
+import { DateCell } from "../component/cellComponents/DateCell";
+import { EditActionCell } from "../component/cellComponents/EditActionsCell";
+import HTMLCell from "../component/cellComponents/HTMLCell";
+import { IconButtonCell } from "../component/cellComponents/IconButtonCell";
+import { ImageCell } from "../component/cellComponents/ImageCell";
+import { MenuButtonCell } from "../component/cellComponents/MenuButtonCell";
+import PlainTextCell from "../component/cellComponents/PlainTextCell";
+import { SelectCell } from "../component/cellComponents/SelectCell";
+import { SwitchCell } from "../component/cellComponents/SwitchCell";
+import { VideoCell } from "../component/cellComponents/VideoCell";
 import type {
   ColumnProperties,
   ReactTableColumnProps,
@@ -42,6 +87,7 @@ import {
   SortOrderTypes,
   StickyType,
 } from "../component/Constants";
+import { CellWrapper } from "../component/TableStyledWrappers";
 import type {
   EditableCell,
   OnColumnEventArgs,
@@ -58,13 +104,23 @@ import {
   DEFAULT_MENU_VARIANT,
   defaultEditableCell,
   EditableCellActions,
-  HTML_COLUMN_TYPE_ENABLED,
   InlineEditingSaveOptions,
   ORIGINAL_INDEX_KEY,
   PaginationDirection,
   TABLE_COLUMN_ORDER_KEY,
 } from "../constants";
+import IconSVG from "../icon.svg";
+import ThumbnailSVG from "../thumbnail.svg";
 import derivedProperties from "./parseDerivedProperties";
+import contentConfig from "./propertyConfig/contentConfig";
+import styleConfig from "./propertyConfig/styleConfig";
+import type { getColumns } from "./reactTableUtils/getColumnsPureFn";
+import { getMemoiseGetColumnsWithLocalStorageFn } from "./reactTableUtils/getColumnsPureFn";
+import type {
+  tableData,
+  transformDataWithEditableCell,
+} from "./reactTableUtils/transformDataPureFn";
+import { getMemoiseTransformDataWithEditableCell } from "./reactTableUtils/transformDataPureFn";
 import {
   createEditActionColumn,
   deleteLocalTableColumnOrderByWidgetId,
@@ -84,64 +140,6 @@ import {
   isColumnTypeEditable,
   updateAndSyncTableLocalColumnOrders,
 } from "./utilities";
-import contentConfig from "./propertyConfig/contentConfig";
-import styleConfig from "./propertyConfig/styleConfig";
-import type { BatchPropertyUpdatePayload } from "actions/controlActions";
-import type { IconName } from "@blueprintjs/icons";
-import { IconNames } from "@blueprintjs/icons";
-import { Colors } from "constants/Colors";
-import equal from "fast-deep-equal/es6";
-import {
-  DefaultAutocompleteDefinitions,
-  sanitizeKey,
-} from "widgets/WidgetUtils";
-import PlainTextCell from "../component/cellComponents/PlainTextCell";
-import { ButtonCell } from "../component/cellComponents/ButtonCell";
-import { MenuButtonCell } from "../component/cellComponents/MenuButtonCell";
-import { ImageCell } from "../component/cellComponents/ImageCell";
-import { VideoCell } from "../component/cellComponents/VideoCell";
-import { IconButtonCell } from "../component/cellComponents/IconButtonCell";
-import { EditActionCell } from "../component/cellComponents/EditActionsCell";
-import { CheckboxCell } from "../component/cellComponents/CheckboxCell";
-import { SwitchCell } from "../component/cellComponents/SwitchCell";
-import { SelectCell } from "../component/cellComponents/SelectCell";
-import { CellWrapper } from "../component/TableStyledWrappers";
-import localStorage from "utils/localStorage";
-import type { SetterConfig, Stylesheet } from "entities/AppTheming";
-import { DateCell } from "../component/cellComponents/DateCell";
-import type { MenuItem } from "widgets/MenuButtonWidget/constants";
-import { MenuItemsSource } from "widgets/MenuButtonWidget/constants";
-import { TimePrecision } from "widgets/DatePickerWidget2/constants";
-import type { getColumns } from "./reactTableUtils/getColumnsPureFn";
-import { getMemoiseGetColumnsWithLocalStorageFn } from "./reactTableUtils/getColumnsPureFn";
-import type {
-  tableData,
-  transformDataWithEditableCell,
-} from "./reactTableUtils/transformDataPureFn";
-import { getMemoiseTransformDataWithEditableCell } from "./reactTableUtils/transformDataPureFn";
-import type { ExtraDef } from "utils/autocomplete/defCreatorUtils";
-import { generateTypeDef } from "utils/autocomplete/defCreatorUtils";
-import type {
-  AnvilConfig,
-  AutocompletionDefinitions,
-  PropertyUpdates,
-  SnipingModeProperty,
-} from "WidgetProvider/constants";
-import type {
-  WidgetQueryConfig,
-  WidgetQueryGenerationFormConfig,
-} from "WidgetQueryGenerators/types";
-import type { DynamicPath } from "utils/DynamicBindingUtils";
-import { FILL_WIDGET_MIN_WIDTH } from "constants/minWidthConstants";
-import {
-  FlexVerticalAlignment,
-  ResponsiveBehavior,
-} from "layoutSystems/common/utils/constants";
-import IconSVG from "../icon.svg";
-import ThumbnailSVG from "../thumbnail.svg";
-import { klonaRegularWithTelemetry } from "utils/helpers";
-import HTMLCell from "../component/cellComponents/HTMLCell";
-import { objectKeys } from "@appsmith/utils";
 
 const ReactTableComponent = lazy(async () =>
   retryPromise(async () => import("../component")),
@@ -231,6 +229,8 @@ class TableWidgetV2 extends BaseWidget<TableWidgetProps, WidgetState> {
         : undefined,
       customIsLoading: false,
       customIsLoadingValue: "",
+      cachedTableData: {},
+      endOfData: false,
     };
   }
 
@@ -915,51 +915,21 @@ class TableWidgetV2 extends BaseWidget<TableWidgetProps, WidgetState> {
       this.hydrateStickyColumns();
     }
 
-    /**
-     * Why we are doing this?
-     * This is a safety net! Consider this scenario:
-     * 1. HTML column type is enabled.
-     * 2. User creates a table with HTML columns.
-     * 3. HTML column type is disabled. (For any reason)
-     *
-     * In this scenario, we don't want incomplete experience for the user.
-     * Without this safety net, the property pane will not show the HTML as type and the `ColumnType` will be lost(and empty), which is confusing for the user.
-     * With this safety net, we will update the column type to TEXT.
-     * @rahulbarwal Remove this once we remove the feature flag
-     */
-    if (!TableWidgetV2.getFeatureFlag(HTML_COLUMN_TYPE_ENABLED)) {
-      let hasHTMLColumns = false;
-      const { primaryColumns } = this.props;
-
-      const updatedPrimaryColumns = objectKeys(primaryColumns).reduce(
-        (acc, widgetId) => {
-          const column = primaryColumns[widgetId];
-
-          if (column.columnType === ColumnTypes.HTML) {
-            acc[widgetId] = { ...column, columnType: ColumnTypes.TEXT };
-            hasHTMLColumns = true;
-          } else {
-            acc[widgetId] = column;
-          }
-
-          return acc;
-        },
-        {} as Record<string, ColumnProperties>,
-      );
-
-      if (hasHTMLColumns) {
-        this.updateWidgetProperty("primaryColumns", updatedPrimaryColumns);
-      }
-    }
+    // Commit Batch Updates property `true` is passed as commitBatchMetaUpdates is not called on componentDidMount and we need to call it for updating the batch updates
+    this.updateInfiniteScrollProperties(true);
   }
 
   componentDidUpdate(prevProps: TableWidgetProps) {
     const {
+      commitBatchMetaUpdates,
+      componentHeight,
       defaultSelectedRowIndex,
       defaultSelectedRowIndices,
+      infiniteScrollEnabled,
       pageNo,
       pageSize,
       primaryColumns = {},
+      pushBatchMetaUpdates,
       serverSidePaginationEnabled,
       totalRecordsCount,
     } = this.props;
@@ -993,8 +963,6 @@ class TableWidgetV2 extends BaseWidget<TableWidgetProps, WidgetState> {
     // Check if tableData is modifed
     const isTableDataModified = this.props.tableData !== prevProps.tableData;
 
-    const { commitBatchMetaUpdates, pushBatchMetaUpdates } = this.props;
-
     // If the user has changed the tableData OR
     // The binding has returned a new value
     if (isTableDataModified) {
@@ -1021,18 +989,35 @@ class TableWidgetV2 extends BaseWidget<TableWidgetProps, WidgetState> {
 
         pushBatchMetaUpdates("filters", []);
       }
-    }
 
-    /*
-     * Clear transient table data and editablecell when tableData changes
-     */
-    if (isTableDataModified) {
+      /*
+       * Clear transient table data and editablecell when tableData changes
+       */
       pushBatchMetaUpdates("transientTableData", {});
       // reset updatedRowIndex whenever transientTableData is flushed.
       pushBatchMetaUpdates("updatedRowIndex", -1);
 
+      /*
+       * Updating the caching layer on table data modification
+       * Commit Batch Updates property `false` is passed as commitBatchMetaUpdates is called on componentDidUpdate
+       * and we need not to explicitly call it for updating the batch updates
+       * */
+      this.updateInfiniteScrollProperties();
+
       this.pushClearEditableCellsUpdates();
       pushBatchMetaUpdates("selectColumnFilterText", {});
+    } else {
+      // TODO: reset the widget on any property change, like if the toggle of infinite scroll is enabled and previously it was disabled, currently we update cachedTableData property to the current tableData at pageNo.
+      /*
+       * Commit Batch Updates property `false` is passed as commitBatchMetaUpdates is called on componentDidUpdate
+       * and we need not to explicitly call it for updating the batch updates
+       * */
+      if (
+        !prevProps.infiniteScrollEnabled &&
+        this.props.infiniteScrollEnabled
+      ) {
+        this.updateInfiniteScrollProperties();
+      }
     }
 
     if (!pageNo) {
@@ -1055,6 +1040,20 @@ class TableWidgetV2 extends BaseWidget<TableWidgetProps, WidgetState> {
           this.updatePaginationDirectionFlags(PaginationDirection.NEXT_PAGE);
         }
       }
+    }
+
+    // Reset widget state when infinite scroll is initially enabled
+    // This should come after all updateInfiniteScrollProperties are done
+    if (!prevProps.infiniteScrollEnabled && infiniteScrollEnabled) {
+      this.resetTableForInfiniteScroll();
+    }
+
+    // Reset widget state when height changes while infinite scroll is enabled
+    if (
+      infiniteScrollEnabled &&
+      prevProps.componentHeight !== componentHeight
+    ) {
+      this.resetTableForInfiniteScroll();
     }
 
     /*
@@ -1255,6 +1254,7 @@ class TableWidgetV2 extends BaseWidget<TableWidgetProps, WidgetState> {
     const {
       customIsLoading,
       customIsLoadingValue,
+      customSortFunction: customSortFunctionData,
       delimiter,
       filteredTableData = [],
       isVisibleDownload,
@@ -1267,7 +1267,14 @@ class TableWidgetV2 extends BaseWidget<TableWidgetProps, WidgetState> {
     } = this.props;
 
     const tableColumns = this.getTableColumns() || emptyArr;
-    const transformedData = this.transformData(filteredTableData, tableColumns);
+    let data = filteredTableData;
+
+    if (customSortFunctionData && Array.isArray(customSortFunctionData)) {
+      data = customSortFunctionData;
+    }
+
+    const transformedData = this.transformData(data, tableColumns);
+
     const isVisibleHeaderOptions =
       isVisibleDownload ||
       isVisibleFilters ||
@@ -1303,6 +1310,7 @@ class TableWidgetV2 extends BaseWidget<TableWidgetProps, WidgetState> {
           disabledAddNewRowSave={this.hasInvalidColumnCell()}
           editMode={this.props.renderMode === RenderModes.CANVAS}
           editableCell={this.props.editableCell}
+          endOfData={this.props.endOfData}
           filters={this.props.filters}
           handleColumnFreeze={this.handleColumnFreeze}
           handleReorderColumn={this.handleReorderColumn}
@@ -1310,6 +1318,7 @@ class TableWidgetV2 extends BaseWidget<TableWidgetProps, WidgetState> {
           height={componentHeight}
           isAddRowInProgress={this.props.isAddRowInProgress}
           isEditableCellsValid={this.props.isEditableCellsValid}
+          isInfiniteScrollEnabled={this.props.infiniteScrollEnabled}
           isLoading={
             customIsLoading
               ? customIsLoadingValue || this.props.isLoading
@@ -1995,10 +2004,11 @@ class TableWidgetV2 extends BaseWidget<TableWidgetProps, WidgetState> {
      */
     if (this.props.isAddRowInProgress) {
       row = filteredTableData[rowIndex - 1];
-      originalIndex = rowIndex === 0 ? -1 : row[ORIGINAL_INDEX_KEY] ?? rowIndex;
+      originalIndex =
+        rowIndex === 0 ? -1 : row?.[ORIGINAL_INDEX_KEY] ?? rowIndex;
     } else {
       row = filteredTableData[rowIndex];
-      originalIndex = row[ORIGINAL_INDEX_KEY] ?? rowIndex;
+      originalIndex = row ? row[ORIGINAL_INDEX_KEY] ?? rowIndex : rowIndex;
     }
 
     const isNewRow = this.props.isAddRowInProgress && rowIndex === 0;
@@ -3011,6 +3021,88 @@ class TableWidgetV2 extends BaseWidget<TableWidgetProps, WidgetState> {
   onConnectData = () => {
     if (this.props.renderMode === RenderModes.CANVAS) {
       super.updateOneClickBindingOptionsVisibility(true);
+    }
+  };
+
+  updateInfiniteScrollProperties(shouldCommitBatchUpdates?: boolean) {
+    const {
+      cachedTableData,
+      commitBatchMetaUpdates,
+      infiniteScrollEnabled,
+      pageNo,
+      pageSize,
+      processedTableData,
+      pushBatchMetaUpdates,
+      tableData,
+      totalRecordsCount,
+    } = this.props;
+
+    if (infiniteScrollEnabled) {
+      // Update the cache key for a particular page whenever this function is called. The pageNo data is updated with the tableData.
+      const updatedCachedTableData = {
+        ...(cachedTableData || {}),
+        [pageNo]: tableData,
+      };
+
+      pushBatchMetaUpdates("cachedTableData", updatedCachedTableData);
+
+      // The check (!!totalRecordsCount && processedTableData.length === totalRecordsCount) is added if the totalRecordsCount property is set then match the length with the processedTableData which has all flatted data from each page in a single array except the current tableData page i.e. [ ...array of page 1 data, ...array of page 2 data ]. Another 'or' check is if (tableData.length < pageSize) when totalRecordsCount is undefined. Table data has a single page data and if the data comes out to be lesser than the pageSize, it is assumed that the data is finished.
+      if (
+        (!!totalRecordsCount &&
+          processedTableData.length + tableData.length === totalRecordsCount) ||
+        (!totalRecordsCount && tableData.length < pageSize)
+      ) {
+        pushBatchMetaUpdates("endOfData", true);
+      } else {
+        pushBatchMetaUpdates("endOfData", false);
+      }
+
+      if (shouldCommitBatchUpdates) {
+        commitBatchMetaUpdates();
+      }
+    }
+  }
+
+  resetTableForInfiniteScroll = () => {
+    const {
+      infiniteScrollEnabled,
+      pushBatchMetaUpdates,
+      updateWidgetMetaProperty,
+    } = this.props;
+
+    if (infiniteScrollEnabled) {
+      // reset the cachedRows
+      const isAlreadyOnFirstPage = this.props.pageNo === 1;
+      const data = isAlreadyOnFirstPage ? { 1: this.props.tableData } : {};
+
+      pushBatchMetaUpdates("cachedTableData", data);
+      pushBatchMetaUpdates("endOfData", false);
+
+      // Explicitly reset specific meta properties
+      updateWidgetMetaProperty("selectedRowIndex", undefined);
+      updateWidgetMetaProperty("selectedRowIndices", undefined);
+      updateWidgetMetaProperty("searchText", undefined);
+      updateWidgetMetaProperty("triggeredRowIndex", undefined);
+      updateWidgetMetaProperty("filters", []);
+      updateWidgetMetaProperty("sortOrder", {
+        column: "",
+        order: null,
+      });
+      updateWidgetMetaProperty("transientTableData", {});
+      updateWidgetMetaProperty("updatedRowIndex", -1);
+      updateWidgetMetaProperty("editableCell", defaultEditableCell);
+      updateWidgetMetaProperty("columnEditableCellValue", {});
+      updateWidgetMetaProperty("selectColumnFilterText", {});
+      updateWidgetMetaProperty("isAddRowInProgress", false);
+      updateWidgetMetaProperty("newRowContent", undefined);
+      updateWidgetMetaProperty("newRow", undefined);
+      updateWidgetMetaProperty("previousPageVisited", false);
+      updateWidgetMetaProperty("nextPageVisited", false);
+
+      // reset and reload page
+      if (!isAlreadyOnFirstPage) {
+        this.updatePageNumber(1, EventType.ON_NEXT_PAGE);
+      }
     }
   };
 }

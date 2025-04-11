@@ -1,7 +1,6 @@
-import type { IDEType } from "ee/entities/IDE/constants";
-import { IDE_TYPE } from "ee/entities/IDE/constants";
-import { AppIDEFocusStrategy } from "./AppIDEFocusStrategy";
-import { NoIDEFocusStrategy } from "./NoIDEFocusStrategy";
+import { IDE_TYPE, type IDEType } from "ee/IDE/Interfaces/IDETypes";
+import { AppIDEFocusStrategy } from "ee/navigation/FocusStrategy/AppIDEFocusStrategy";
+import { NoIDEFocusStrategy } from "ee/navigation/FocusStrategy/NoIDEFocusStrategy";
 
 export const getIDEFocusStrategy = (type: IDEType) => {
   switch (type) {

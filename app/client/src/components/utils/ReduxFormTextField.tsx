@@ -40,6 +40,7 @@ const renderComponent = (
         componentProps.meta.error
       }
       isDisabled={componentProps.disabled}
+      postfix={componentProps.postfix}
       renderAs={componentProps.type === "textarea" ? "textarea" : "input"}
       size="md"
       value={value}
@@ -65,6 +66,7 @@ export interface FormTextFieldProps {
   // TODO: Fix this the next time the file is edited
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parse?: (value: any) => any;
+  postfix?: string;
 }
 
 function ReduxFormTextField(props: FormTextFieldProps) {

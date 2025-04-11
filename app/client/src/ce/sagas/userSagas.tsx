@@ -124,7 +124,7 @@ export function* getCurrentUserSaga(action?: {
 function* getSessionRecordingConfig() {
   const featureFlags: FeatureFlags = yield select(selectFeatureFlags);
 
-  // This is a tenant level flag to kill session recordings
+  // This is a organization level flag to kill session recordings
   // If this is true, we do not do any session recordings
   if (featureFlags.kill_session_recordings_enabled) {
     return {
@@ -142,7 +142,7 @@ function* getSessionRecordingConfig() {
     };
   }
 
-  // Now we know that both tenant and user level flags are not blocking session recordings
+  // Now we know that both organization and user level flags are not blocking session recordings
   return {
     enabled: true,
     // Check if we need to mask the session recordings from feature flags
@@ -247,6 +247,7 @@ export function* runUserSideEffectsSaga() {
   if (enableTelemetry) {
     yield fork(initTrackers, currentUser);
   } else {
+    yield call(AnalyticsUtil.avoidTracking);
     yield put(segmentInitSuccess());
   }
 
@@ -723,3 +724,16 @@ export const setMessageConfig = (id: string, config: ProductAlertConfig) => {
     JSON.stringify(updatedConfig),
   );
 };
+
+export function* globalFunctionLogoutUser(
+  action: ReduxAction<{ redirectURL: string }>,
+) {
+  const redirectURL = `${AUTH_LOGIN_URL}?redirectUrl=${encodeURIComponent(action.payload?.redirectURL ? action.payload?.redirectURL : history.location.pathname)}`;
+
+  yield call(logoutSaga, {
+    type: ReduxActionTypes.LOGOUT_USER_INIT,
+    payload: {
+      redirectURL,
+    },
+  });
+}

@@ -159,8 +159,8 @@ public class PluginServiceCEImpl extends BaseService<PluginRepository, Plugin, S
         if (newWorkspacePlugins.isEmpty()) {
             return Flux.empty();
         }
-
-        return workspaceService.getAll().flatMap(workspace -> {
+        // used retrieveAll() as it does not need user session context
+        return workspaceService.retrieveAll().flatMap(workspace -> {
             // Only perform a DB op if plugins associated to this org have changed
             if (workspace.getPlugins().containsAll(newWorkspacePlugins)) {
                 return Mono.just(workspace);
@@ -562,6 +562,11 @@ public class PluginServiceCEImpl extends BaseService<PluginRepository, Plugin, S
     @Override
     public Flux<Plugin> getAllRemotePlugins() {
         return repository.findByType(PluginType.REMOTE);
+    }
+
+    @Override
+    public Flux<Plugin> getPluginsByType(PluginType pluginType) {
+        return repository.findByType(pluginType);
     }
 
     private Map<?, ?> loadPluginResourceGivenPluginAsMap(Plugin plugin, String resourcePath) {

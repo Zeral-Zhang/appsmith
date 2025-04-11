@@ -10,7 +10,7 @@ import {
 } from "ee/constants/messages";
 import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
 import { getCurrentApplicationIdForCreateNewApp } from "ee/selectors/applicationSelectors";
-import { getTenantPermissions } from "ee/selectors/tenantSelectors";
+import { getOrganizationPermissions } from "ee/selectors/organizationSelectors";
 import {
   getAdminSettingsPath,
   getShowAdminSettings,
@@ -37,9 +37,10 @@ import {
   getOnSelectAction,
 } from "../CustomizedDropdown/dropdownHelpers";
 import { IntercomConsent } from "pages/Editor/HelpButton";
-import { DOCS_BASE_URL } from "constants/ThirdPartyConstants";
+import { DOCS_AI_BASE_URL, DOCS_BASE_URL } from "constants/ThirdPartyConstants";
 import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
 import styled from "styled-components";
+import { getIsAiAgentFlowEnabled } from "ee/selectors/aiAgentSelectors";
 const { cloudHosting, intercomAppID } = getAppsmithConfigs();
 
 export const VersionData = styled.div`
@@ -61,7 +62,7 @@ const HomepageHeaderAction = ({
 }) => {
   const dispatch = useDispatch();
   const isFeatureEnabled = useFeatureFlag(FEATURE_FLAG.license_gac_enabled);
-  const tenantPermissions = useSelector(getTenantPermissions);
+  const organizationPermissions = useSelector(getOrganizationPermissions);
   const isCreateNewAppFlow = useSelector(
     getCurrentApplicationIdForCreateNewApp,
   );
@@ -70,6 +71,7 @@ const HomepageHeaderAction = ({
   const { appVersion } = getAppsmithConfigs();
   const howMuchTimeBefore = howMuchTimeBeforeText(appVersion.releaseDate);
   const [showIntercomConsent, setShowIntercomConsent] = useState(false);
+  const isAiAgentFlowEnabled = useSelector(getIsAiAgentFlowEnabled);
 
   if (!isHomePage || !!isCreateNewAppFlow) return null;
 
@@ -87,7 +89,7 @@ const HomepageHeaderAction = ({
                 path: getAdminSettingsPath(
                   isFeatureEnabled,
                   user?.isSuperUser,
-                  tenantPermissions,
+                  organizationPermissions,
                 ),
               });
             }}
@@ -127,6 +129,12 @@ const HomepageHeaderAction = ({
                 <MenuItem
                   className="t--documentation-button"
                   onClick={() => {
+                    if (isAiAgentFlowEnabled) {
+                      window.open(DOCS_AI_BASE_URL, "_blank");
+
+                      return;
+                    }
+
                     window.open(DOCS_BASE_URL, "_blank");
                   }}
                   startIcon="book-line"

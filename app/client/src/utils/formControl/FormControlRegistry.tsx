@@ -37,11 +37,25 @@ import MultiFilePickerControl from "components/formControls/MultiFilePickerContr
 import type { MultipleFilePickerControlProps } from "components/formControls/MultiFilePickerControl";
 import type { RadioButtonControlProps } from "components/formControls/RadioButtonControl";
 import RadioButtonControl from "components/formControls/RadioButtonControl";
-import { RagIntegrations } from "ee/components/formControls/Rag";
+import {
+  RagIntegrations,
+  RagDocumentsSelector,
+} from "ee/components/formControls/Rag";
 import {
   SliderControl,
   type SliderControlProps,
 } from "components/formControls/SliderControl";
+import { HybridSearchControl } from "components/formControls/HybridSearch";
+import FunctionCallingConfigControl from "components/formControls/FunctionCallingConfigControl";
+import {
+  DatasourceLinkControl,
+  type DatasourceLinkControlProps,
+} from "components/formControls/DatasourceLinkControl";
+import { CustomActionsControl } from "components/formControls/CustomActionsConfigControl";
+import {
+  AiChatSystemInstructionsControl,
+  type AiChatSystemInstructionsControlProps,
+} from "components/formControls/AIChatSystemInstructionsControl";
 
 /**
  * NOTE: If you are adding a component that uses FormControl
@@ -208,6 +222,56 @@ class FormControlRegistry {
         return <SliderControl {...controlProps} />;
       },
     });
+    FormControlFactory.registerControlBuilder(
+      formControlTypes.RAG_DOCUMENTS_SELECTOR,
+      {
+        buildPropertyControl(controlProps): JSX.Element {
+          return <RagDocumentsSelector {...controlProps} />;
+        },
+      },
+    );
+    FormControlFactory.registerControlBuilder(formControlTypes.HYBRID_SEARCH, {
+      buildPropertyControl(controlProps: SliderControlProps): JSX.Element {
+        return <HybridSearchControl {...controlProps} />;
+      },
+    });
+    FormControlFactory.registerControlBuilder(
+      formControlTypes.AI_CHAT_SYSTEM_INSTRUCTIONS,
+      {
+        buildPropertyControl(
+          controlProps: AiChatSystemInstructionsControlProps,
+        ): JSX.Element {
+          return <AiChatSystemInstructionsControl {...controlProps} />;
+        },
+      },
+    );
+    FormControlFactory.registerControlBuilder(
+      formControlTypes.FUNCTION_CALLING_CONFIG_FORM,
+      {
+        buildPropertyControl(controlProps): JSX.Element {
+          return <FunctionCallingConfigControl {...controlProps} />;
+        },
+      },
+    );
+    FormControlFactory.registerControlBuilder(
+      formControlTypes.DATASOURCE_LINK,
+      {
+        buildPropertyControl(
+          controlProps: DatasourceLinkControlProps,
+        ): JSX.Element {
+          return <DatasourceLinkControl {...controlProps} />;
+        },
+      },
+    );
+
+    FormControlFactory.registerControlBuilder(
+      formControlTypes.CUSTOM_ACTIONS_CONFIG_FORM,
+      {
+        buildPropertyControl(controlProps): JSX.Element {
+          return <CustomActionsControl {...controlProps} />;
+        },
+      },
+    );
   }
 }
 

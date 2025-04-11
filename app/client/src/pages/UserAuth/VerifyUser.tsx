@@ -6,18 +6,21 @@ import * as Sentry from "@sentry/react";
 import { EMAIL_VERIFICATION_PATH } from "ee/constants/ApiConstants";
 import { Redirect } from "react-router-dom";
 import { VerificationErrorType } from "./VerificationError";
+import CsrfTokenInput from "pages/UserAuth/CsrfTokenInput";
 
 const VerifyUser = (
   props: RouteComponentProps<{
     email: string;
     token: string;
     redirectUrl: string;
+    organizationId: string;
   }>,
 ) => {
   const queryParams = new URLSearchParams(props.location.search);
 
   const token = queryParams.get("token");
   const email = queryParams.get("email");
+  const organizationId = queryParams.get("organizationId");
 
   useEffect(() => {
     if (!token || !email) {
@@ -47,16 +50,26 @@ const VerifyUser = (
   return (
     <Container title={"Verifying"}>
       <form action={submitUrl} id="verification-form" method="POST">
-        {Array.from(queryParams.entries()).map((param) => {
-          return (
-            <input
-              key={param[0]}
-              name={param[0]}
-              type="hidden"
-              value={param[1]}
-            />
-          );
-        })}
+        <CsrfTokenInput />
+        <input name="email" type="hidden" value={email} />
+        <input name="token" type="hidden" value={token} />
+        {organizationId && (
+          <input name="organizationId" type="hidden" value={organizationId} />
+        )}
+        {queryParams.get("redirectUrl") && (
+          <input
+            name="redirectUrl"
+            type="hidden"
+            value={queryParams.get("redirectUrl") || ""}
+          />
+        )}
+        {queryParams.get("enableFirstTimeUserExperience") && (
+          <input
+            name="enableFirstTimeUserExperience"
+            type="hidden"
+            value={queryParams.get("enableFirstTimeUserExperience") || "false"}
+          />
+        )}
       </form>
       <Spinner size="lg" />
     </Container>

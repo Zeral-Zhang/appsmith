@@ -358,12 +358,11 @@ export class HomePage {
 
   //Maps to LogOut in command.js
   public LogOutviaAPI() {
-    let httpMethod = "POST";
-    if (CURRENT_REPO === REPO.EE) {
-      httpMethod = "GET";
-    }
+    // We explicitly clear the `XSRF-TOKEN` cookie since Cypress often sends a stale cookie value without updating it to
+    // the correct value. Ref: https://github.com/cypress-io/cypress/issues/25841.
+    cy.clearCookie("XSRF-TOKEN");
     cy.request({
-      method: httpMethod,
+      method: "POST",
       url: "/api/v1/logout",
       headers: {
         "X-Requested-By": "Appsmith",
@@ -401,6 +400,9 @@ export class HomePage {
   }
 
   public InvokeDispatchOnStore() {
+    // We explicitly clear the `XSRF-TOKEN` cookie since Cypress often sends a stale cookie value without updating it to
+    // the correct value. Ref: https://github.com/cypress-io/cypress/issues/25841.
+    cy.clearCookie("XSRF-TOKEN");
     cy.window().then((win: any) => {
       if (win && win.store) {
         cy.window()

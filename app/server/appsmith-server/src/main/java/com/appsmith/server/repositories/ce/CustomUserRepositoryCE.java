@@ -1,6 +1,5 @@
 package com.appsmith.server.repositories.ce;
 
-import com.appsmith.server.acl.AclPermission;
 import com.appsmith.server.domains.User;
 import com.appsmith.server.repositories.AppsmithRepository;
 import org.springframework.data.mongodb.core.query.UpdateDefinition;
@@ -10,9 +9,7 @@ import java.util.Set;
 
 public interface CustomUserRepositoryCE extends AppsmithRepository<User> {
 
-    Mono<User> findByEmail(String email, AclPermission aclPermission);
-
-    Mono<User> findByEmailAndTenantId(String email, String tenantId);
+    Mono<User> findByEmailAndOrganizationId(String email, String organizationId);
 
     Mono<Boolean> isUsersEmpty();
 

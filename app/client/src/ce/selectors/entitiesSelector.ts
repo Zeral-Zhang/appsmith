@@ -18,7 +18,7 @@ import type { Action } from "entities/Action";
 import { isStoredDatasource } from "entities/Action";
 import { countBy, find, get, groupBy, keyBy, sortBy } from "lodash";
 import ImageAlt from "assets/images/placeholder-image.svg";
-import type { CanvasWidgetsReduxState } from "reducers/entityReducers/canvasWidgetsReducer";
+import type { CanvasWidgetsReduxState } from "ee/reducers/entityReducers/canvasWidgetsReducer";
 import { MAIN_CONTAINER_WIDGET_ID } from "constants/WidgetConstants";
 import type { AppStoreState } from "reducers/entityReducers/appReducer";
 import type {
@@ -57,12 +57,12 @@ import {
 import { MAX_DATASOURCE_SUGGESTIONS } from "constants/DatasourceEditorConstants";
 import type { CreateNewActionKeyInterface } from "ee/entities/Engine/actionHelpers";
 import { getNextEntityName } from "utils/AppsmithUtils";
-import {
-  EditorEntityTab,
-  type EntityItem,
-  type GenericEntityItem,
-  type IDEType,
-} from "ee/entities/IDE/constants";
+import { EditorEntityTab } from "IDE/Interfaces/EditorTypes";
+import type { IDEType } from "ee/IDE/Interfaces/IDETypes";
+import type {
+  EntityItem,
+  GenericEntityItem,
+} from "ee/IDE/Interfaces/EntityItem";
 import {
   ActionUrlIcon,
   JsFileIconV2,
@@ -123,6 +123,10 @@ export const getDatasourcesGroupedByPluginCategory = createSelector(
 
     return <DatasourceGroupByPluginCategory>groupBy(datasources, (d) => {
       const plugin = groupedPlugins[d.pluginId];
+
+      if (!plugin) {
+        return PluginCategory.SAAS;
+      }
 
       if (
         plugin.type === PluginType.SAAS ||
@@ -453,6 +457,12 @@ export const getActions = (state: AppState): ActionDataState =>
 
 export const getJSCollections = (state: AppState): JSCollectionDataState =>
   state.entities.jsActions;
+
+export const getAllJSCollectionActions = (state: AppState) => {
+  return state.entities.jsActions.flatMap(
+    (jsCollection) => jsCollection.config.actions,
+  );
+};
 
 export const getDatasource = (
   state: AppState,
@@ -832,6 +842,20 @@ export const getJsCollectionByBaseId = (
   );
 
   return jsaction && jsaction.config;
+};
+
+export const getJSCollectionAction = (
+  state: AppState,
+  collectionId: string,
+  actionId: string,
+) => {
+  const jsCollection = getJSCollection(state, collectionId);
+
+  if (jsCollection) {
+    return jsCollection.actions.find((action) => action.id === actionId);
+  }
+
+  return null;
 };
 
 /**
@@ -1738,3 +1762,40 @@ export const getIsSavingEntityName = (
 
   return isSavingEntityName;
 };
+
+export const getActionSchemaDirtyState = createSelector(
+  getAction,
+  (state: AppState) =>
+    getPluginByPackageName(state, PluginPackageName.APPSMITH_AI),
+  (action, agentPlugin) => {
+    if (!action) return false;
+
+    if (agentPlugin?.id === action.pluginId) {
+      return false;
+    }
+
+    return action.isDirtyMap?.SCHEMA_GENERATION;
+  },
+);
+
+export const getJSCollectionSchemaDirtyState = createSelector(
+  (state: AppState, collectionId: string) =>
+    getJSCollection(state, collectionId),
+  (jsCollection) => {
+    if (!jsCollection) return false;
+
+    return jsCollection.actions.some(
+      (action) => action.isDirtyMap?.SCHEMA_GENERATION,
+    );
+  },
+);
+
+export const getJSCollectionActionSchemaDirtyState = createSelector(
+  (state: AppState, collectionId: string, actionId: string) =>
+    getJSCollectionAction(state, collectionId, actionId),
+  (action) => {
+    if (!action) return false;
+
+    return action.isDirtyMap?.SCHEMA_GENERATION;
+  },
+);

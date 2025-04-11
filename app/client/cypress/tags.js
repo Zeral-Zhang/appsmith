@@ -26,6 +26,7 @@ module.exports = {
     "@tag.GSheet",
     "@tag.GenerateCRUD",
     "@tag.Git",
+    "@tag.Hubspot",
     "@tag.IDE",
     "@tag.IconButton",
     "@tag.Iframe",
@@ -56,6 +57,7 @@ module.exports = {
     "@tag.Settings",
     "@tag.SignIn",
     "@tag.Slider",
+    "@tag.Snowflake",
     "@tag.Statbox",
     "@tag.Switch",
     "@tag.Tab",
@@ -71,5 +73,6 @@ module.exports = {
     "@tag.Workspace",
     "@tag.airgap",
     "@tag.excludeForAirgap",
+    "@tag.AIAgents",
   ],
 };

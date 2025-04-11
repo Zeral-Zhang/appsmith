@@ -1,26 +1,38 @@
+import type { PropertyPaneConfig } from "constants/PropertyControlConstants";
+import { ValidationTypes } from "constants/WidgetValidation";
 import {
   createMessage,
   TABLE_WIDGET_TOTAL_RECORD_TOOLTIP,
 } from "ee/constants/messages";
-import type { PropertyPaneConfig } from "constants/PropertyControlConstants";
-import { ValidationTypes } from "constants/WidgetValidation";
-import { EvaluationSubstitutionType } from "entities/DataTree/dataTreeFactory";
+import { EvaluationSubstitutionType } from "ee/entities/DataTree/types";
 import { AutocompleteDataType } from "utils/autocomplete/AutocompleteDataType";
 import type { TableWidgetProps } from "widgets/TableWidgetV2/constants";
-import { ALLOW_TABLE_WIDGET_SERVER_SIDE_FILTERING } from "../../constants";
-import { InlineEditingSaveOptions } from "widgets/TableWidgetV2/constants";
+import {
+  INFINITE_SCROLL_ENABLED,
+  InlineEditingSaveOptions,
+} from "widgets/TableWidgetV2/constants";
 import { composePropertyUpdateHook } from "widgets/WidgetUtils";
+import {
+  ALLOW_TABLE_WIDGET_SERVER_SIDE_FILTERING,
+  CUSTOM_SORT_FUNCTION_ENABLED,
+} from "../../constants";
+import Widget from "../index";
 import {
   tableDataValidation,
   totalRecordsCountValidation,
   uniqueColumnNameValidation,
+  updateAllowAddNewRowOnInfiniteScrollChange,
+  updateCellEditabilityOnInfiniteScrollChange,
   updateColumnOrderHook,
   updateCustomColumnAliasOnLabelChange,
   updateInlineEditingOptionDropdownVisibilityHook,
   updateInlineEditingSaveOptionHook,
+  updateSearchSortFilterOnInfiniteScrollChange,
 } from "../propertyUtils";
 import panelConfig from "./PanelConfig";
-import Widget from "../index";
+
+const INFINITE_SCROLL_DISABLED_HELP_TEXT =
+  "This feature is disabled because infinite scroll is enabled";
 
 export default [
   {
@@ -34,6 +46,7 @@ export default [
         controlType: "ONE_CLICK_BINDING_CONTROL",
         controlConfig: {
           searchableColumn: true,
+          maxHeight: "400px",
         },
         placeholderText: '[{ "name": "John" }]',
         inputType: "ARRAY",
@@ -169,6 +182,26 @@ export default [
         controlType: "SWITCH",
         isBindProperty: false,
         isTriggerProperty: false,
+        shouldDisableSection: (props: TableWidgetProps) =>
+          props.infiniteScrollEnabled,
+        disabledHelpText: INFINITE_SCROLL_DISABLED_HELP_TEXT,
+        dependencies: ["infiniteScrollEnabled"],
+      },
+      {
+        helpText:
+          "Bind the Table.pageNo property in your API and call it onPageChange",
+        propertyName: "infiniteScrollEnabled",
+        label: "Infinite scroll",
+        controlType: "SWITCH",
+        isBindProperty: false,
+        isTriggerProperty: false,
+        updateHook: composePropertyUpdateHook([
+          updateAllowAddNewRowOnInfiniteScrollChange,
+          updateCellEditabilityOnInfiniteScrollChange,
+          updateSearchSortFilterOnInfiniteScrollChange,
+        ]),
+        dependencies: ["primaryColumns"],
+        hidden: () => !Widget.getFeatureFlag(INFINITE_SCROLL_ENABLED),
       },
       {
         helpText: createMessage(TABLE_WIDGET_TOTAL_RECORD_TOOLTIP),
@@ -219,6 +252,10 @@ export default [
   },
   {
     sectionName: "Search & filters",
+    shouldDisableSection: (props: TableWidgetProps) =>
+      props.infiniteScrollEnabled,
+    disabledHelpText: INFINITE_SCROLL_DISABLED_HELP_TEXT,
+    dependencies: ["infiniteScrollEnabled"],
     children: [
       {
         propertyName: "isVisibleSearch",
@@ -368,6 +405,10 @@ export default [
   },
   {
     sectionName: "Sorting",
+    shouldDisableSection: (props: TableWidgetProps) =>
+      props.infiniteScrollEnabled,
+    disabledHelpText: INFINITE_SCROLL_DISABLED_HELP_TEXT,
+    dependencies: ["infiniteScrollEnabled"],
     children: [
       {
         helpText: "Controls sorting in View Mode",
@@ -395,11 +436,36 @@ export default [
         hidden: (props: TableWidgetProps) => !props.isSortable,
         dependencies: ["isSortable"],
       },
+      {
+        helperText:
+          "Client side only, custom sort function data(overrides default sorting)",
+        helpText:
+          "Function should expect three arguments: tableData, columnId, and order. Return the sorted tableData.",
+        propertyName: "customSortFunction",
+        label: "Custom sort function data",
+        controlType: "TABLE_CUSTOM_SORT",
+        placeholderText:
+          "{{(tableData, columnId, order) => { /* Return sorted table data */ }}}",
+        controlConfig: {
+          maxHeight: "400px",
+          height: "100px",
+        },
+        isTriggerProperty: false,
+        hidden: (props: TableWidgetProps) =>
+          !props.isSortable ||
+          !Widget.getFeatureFlag(CUSTOM_SORT_FUNCTION_ENABLED),
+        dependencies: ["isSortable"],
+      },
     ],
     expandedByDefault: false,
   },
+
   {
     sectionName: "Adding a row",
+    shouldDisableSection: (props: TableWidgetProps) =>
+      props.infiniteScrollEnabled,
+    disabledHelpText: INFINITE_SCROLL_DISABLED_HELP_TEXT,
+    dependencies: ["infiniteScrollEnabled"],
     children: [
       {
         propertyName: "allowAddNewRow",

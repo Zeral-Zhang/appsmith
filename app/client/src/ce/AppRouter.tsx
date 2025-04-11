@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect } from "react";
 import history from "utils/history";
 import AppHeader from "ee/pages/common/AppHeader";
-import { Redirect, Route, Router, Switch } from "react-router-dom";
+import { Redirect, Router, Switch } from "react-router-dom";
 import {
   ADMIN_SETTINGS_CATEGORY_PATH,
   ADMIN_SETTINGS_PATH,
@@ -17,7 +17,6 @@ import {
   CUSTOM_WIDGETS_DEPRECATED_EDITOR_ID_PATH,
   CUSTOM_WIDGETS_EDITOR_ID_PATH,
   CUSTOM_WIDGETS_EDITOR_ID_PATH_CUSTOM,
-  PROFILE,
   SETUP,
   SIGNUP_SUCCESS_URL,
   SIGN_UP_URL,
@@ -32,7 +31,7 @@ import {
 } from "constants/routes";
 import WorkspaceLoader from "pages/workspace/loader";
 import ApplicationListLoader from "pages/Applications/loader";
-import EditorLoader from "pages/Editor/loader";
+import AppIDE from "pages/AppIDE/AppIDELoader";
 import AppViewerLoader from "pages/AppViewer/loader";
 import LandingScreen from "../LandingScreen";
 import UserAuth from "pages/UserAuth";
@@ -43,16 +42,14 @@ import PageLoadingBar from "pages/common/PageLoadingBar";
 import ErrorPageHeader from "pages/common/ErrorPageHeader";
 import { useDispatch, useSelector } from "react-redux";
 
-import * as Sentry from "@sentry/react";
 import { getSafeCrash, getSafeCrashCode } from "selectors/errorSelectors";
-import UserProfile from "pages/UserProfile";
 import Setup from "pages/setup";
 import SettingsLoader from "pages/AdminSettings/loader";
 import SignupSuccess from "pages/setup/SignupSuccess";
 import type { ERROR_CODES } from "ee/constants/ApiConstants";
 import TemplatesListLoader from "pages/Templates/loader";
 import { getCurrentUser as getCurrentUserSelector } from "selectors/usersSelectors";
-import { getTenantPermissions } from "ee/selectors/tenantSelectors";
+import { getOrganizationPermissions } from "ee/selectors/organizationSelectors";
 import useBrandingTheme from "utils/hooks/useBrandingTheme";
 import RouteChangeListener from "RouteChangeListener";
 import { initCurrentPage } from "../actions/initActions";
@@ -64,14 +61,13 @@ import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
 import CustomWidgetBuilderLoader from "pages/Editor/CustomWidgetBuilder/loader";
 import { getIsConsolidatedPageLoading } from "selectors/ui";
 import { useFeatureFlagOverride } from "utils/hooks/useFeatureFlagOverride";
-
-export const SentryRoute = Sentry.withSentryRouting(Route);
+import { SentryRoute } from "components/SentryRoute";
 
 export const loadingIndicator = <PageLoadingBar />;
 
 export function Routes() {
   const user = useSelector(getCurrentUserSelector);
-  const tenantPermissions = useSelector(getTenantPermissions);
+  const organizationPermissions = useSelector(getOrganizationPermissions);
   const isFeatureEnabled = useFeatureFlag(FEATURE_FLAG.license_gac_enabled);
 
   useFeatureFlagOverride();
@@ -90,7 +86,6 @@ export function Routes() {
         path={APPLICATIONS_URL}
       />
       <SentryRoute component={SignupSuccess} exact path={SIGNUP_SUCCESS_URL} />
-      <SentryRoute component={UserProfile} path={PROFILE} />
       <SentryRoute component={Setup} exact path={SETUP} />
       <SentryRoute component={TemplatesListLoader} path={TEMPLATES_PATH} />
       <Redirect
@@ -102,7 +97,7 @@ export function Routes() {
             : getAdminSettingsPath(
                 isFeatureEnabled,
                 user?.isSuperUser || false,
-                tenantPermissions,
+                organizationPermissions,
               )
         }
       />
@@ -116,7 +111,7 @@ export function Routes() {
         exact
         path={CUSTOM_WIDGETS_DEPRECATED_EDITOR_ID_PATH}
       />
-      <SentryRoute component={EditorLoader} path={BUILDER_PATH_DEPRECATED} />
+      <SentryRoute component={AppIDE} path={BUILDER_PATH_DEPRECATED} />
       <SentryRoute component={AppViewerLoader} path={VIEWER_PATH_DEPRECATED} />
       <SentryRoute
         component={CustomWidgetBuilderLoader}
@@ -133,8 +128,8 @@ export function Routes() {
        * Be sure to check if it is sync with the order of checks in getUpdatedRoute helper method
        * Context: https://github.com/appsmithorg/appsmith/pull/19833
        */}
-      <SentryRoute component={EditorLoader} path={BUILDER_PATH} />
-      <SentryRoute component={EditorLoader} path={BUILDER_CUSTOM_PATH} />
+      <SentryRoute component={AppIDE} path={BUILDER_PATH} />
+      <SentryRoute component={AppIDE} path={BUILDER_CUSTOM_PATH} />
       <SentryRoute component={AppViewerLoader} path={VIEWER_PATH} />
       <SentryRoute component={AppViewerLoader} path={VIEWER_CUSTOM_PATH} />
       {/*
@@ -161,7 +156,7 @@ export default function AppRouter() {
 
   const isLoading = isConsolidatedPageLoading;
 
-  // hide the top loader once the tenant is loaded
+  // hide the top loader once the organization is loaded
   useEffect(() => {
     if (!isLoading) {
       const loader = document.getElementById("loader") as HTMLDivElement;

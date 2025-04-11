@@ -7,14 +7,14 @@ import com.appsmith.server.configurations.EmailConfig;
 import com.appsmith.server.configurations.GoogleRecaptchaConfig;
 import com.appsmith.server.constants.EnvVariables;
 import com.appsmith.server.constants.FieldName;
-import com.appsmith.server.domains.Tenant;
-import com.appsmith.server.domains.TenantConfiguration;
+import com.appsmith.server.domains.Organization;
+import com.appsmith.server.domains.OrganizationConfiguration;
 import com.appsmith.server.domains.User;
 import com.appsmith.server.dtos.TestEmailConfigRequestDTO;
 import com.appsmith.server.exceptions.AppsmithError;
 import com.appsmith.server.exceptions.AppsmithException;
+import com.appsmith.server.helpers.BlacklistedEnvVariableHelper;
 import com.appsmith.server.helpers.CollectionUtils;
-import com.appsmith.server.helpers.FeatureFlagMigrationHelper;
 import com.appsmith.server.helpers.FileUtils;
 import com.appsmith.server.helpers.TextUtils;
 import com.appsmith.server.helpers.UserUtils;
@@ -24,9 +24,9 @@ import com.appsmith.server.repositories.UserRepository;
 import com.appsmith.server.services.AnalyticsService;
 import com.appsmith.server.services.ConfigService;
 import com.appsmith.server.services.EmailService;
+import com.appsmith.server.services.OrganizationService;
 import com.appsmith.server.services.PermissionGroupService;
 import com.appsmith.server.services.SessionUserService;
-import com.appsmith.server.services.TenantService;
 import com.appsmith.server.services.UserService;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,6 +46,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
@@ -83,7 +84,7 @@ import static com.appsmith.server.constants.EnvVariables.APPSMITH_RECAPTCHA_SECR
 import static com.appsmith.server.constants.EnvVariables.APPSMITH_RECAPTCHA_SITE_KEY;
 import static com.appsmith.server.constants.EnvVariables.APPSMITH_REPLY_TO;
 import static com.appsmith.server.constants.EnvVariables.APPSMITH_SIGNUP_ALLOWED_DOMAINS;
-import static com.appsmith.server.constants.EnvVariables.APPSMITH_SIGNUP_DISABLED;
+import static com.appsmith.server.constants.ce.FieldNameCE.ORGANIZATION_ID;
 import static java.lang.Boolean.TRUE;
 
 @Slf4j
@@ -108,11 +109,13 @@ public class EnvManagerCEImpl implements EnvManagerCE {
 
     private final UserUtils userUtils;
 
-    private final TenantService tenantService;
+    private final OrganizationService organizationService;
 
     private final ObjectMapper objectMapper;
 
     private final EmailService emailService;
+
+    private final BlacklistedEnvVariableHelper blacklistedEnvVariableHelper;
 
     /**
      * This regex pattern matches environment variable declarations like `VAR_NAME=value` or `VAR_NAME="value"` or just
@@ -138,9 +141,10 @@ public class EnvManagerCEImpl implements EnvManagerCE {
             PermissionGroupService permissionGroupService,
             ConfigService configService,
             UserUtils userUtils,
-            TenantService tenantService,
+            OrganizationService organizationService,
             ObjectMapper objectMapper,
-            EmailService emailService) {
+            EmailService emailService,
+            BlacklistedEnvVariableHelper blacklistedEnvVariableHelper) {
 
         this.sessionUserService = sessionUserService;
         this.userService = userService;
@@ -155,9 +159,10 @@ public class EnvManagerCEImpl implements EnvManagerCE {
         this.permissionGroupService = permissionGroupService;
         this.configService = configService;
         this.userUtils = userUtils;
-        this.tenantService = tenantService;
+        this.organizationService = organizationService;
         this.objectMapper = objectMapper;
         this.emailService = emailService;
+        this.blacklistedEnvVariableHelper = blacklistedEnvVariableHelper;
     }
 
     /**
@@ -170,52 +175,66 @@ public class EnvManagerCEImpl implements EnvManagerCE {
      * @return List of string lines for updated env file content.
      */
     @Override
-    public List<String> transformEnvContent(String envContent, Map<String, String> changes) {
+    public Mono<List<String>> transformEnvContent(String envContent, Map<String, String> changes) {
         final Set<String> variablesNotInWhitelist = new HashSet<>(changes.keySet());
-        final Set<String> tenantConfigWhitelist = allowedTenantConfiguration();
+        final Set<String> organizationConfigWhitelist = allowedOrganizationConfiguration();
 
-        // We remove all the variables that aren't defined in our env variable whitelist or in the TenantConfiguration
-        // class. This is because the configuration can be saved either in the .env file or the tenant collection
+        // We remove all the variables that aren't defined in our env variable whitelist or in the
+        // OrganizationConfiguration
+        // class. This is because the configuration can be saved either in the .env file or the organization collection
         variablesNotInWhitelist.removeAll(VARIABLE_WHITELIST);
-        variablesNotInWhitelist.removeAll(tenantConfigWhitelist);
-
+        variablesNotInWhitelist.removeAll(organizationConfigWhitelist);
         if (!variablesNotInWhitelist.isEmpty()) {
-            throw new AppsmithException(AppsmithError.GENERIC_BAD_REQUEST);
+            return Mono.error(new AppsmithException(AppsmithError.GENERIC_BAD_REQUEST));
         }
 
-        if (changes.containsKey(APPSMITH_MAIL_HOST.name())) {
-            changes.put(
-                    APPSMITH_MAIL_ENABLED.name(),
-                    Boolean.toString(StringUtils.hasText(changes.get(APPSMITH_MAIL_HOST.name()))));
-        }
+        return organizationService.getCurrentUserOrganizationId().map(organizationId -> {
+            // Create a copy of the changes map to avoid modifying the original map and avoiding unsupported ops
+            // exception if the map is unmodifiable
+            Map<String, String> updatedChanges = new HashMap<>(changes);
+            // Add a check to remove blacklisted envs for updates
+            Set<String> blacklistedEnvVariable =
+                    blacklistedEnvVariableHelper.getBlacklistedEnvVariableForAppsmithCloud(organizationId);
+            for (String key : updatedChanges.keySet()) {
+                if (blacklistedEnvVariable.contains(key)) {
+                    updatedChanges.remove(key);
+                }
+            }
 
-        if (changes.containsKey(APPSMITH_MAIL_USERNAME.name())) {
-            changes.put(
-                    APPSMITH_MAIL_SMTP_AUTH.name(),
-                    Boolean.toString(StringUtils.hasText(changes.get(APPSMITH_MAIL_USERNAME.name()))));
-        }
+            if (updatedChanges.containsKey(APPSMITH_MAIL_HOST.name())) {
+                updatedChanges.put(
+                        APPSMITH_MAIL_ENABLED.name(),
+                        Boolean.toString(StringUtils.hasText(updatedChanges.get(APPSMITH_MAIL_HOST.name()))));
+            }
 
-        final Set<String> remainingChangedNames = new HashSet<>(changes.keySet());
+            if (updatedChanges.containsKey(APPSMITH_MAIL_USERNAME.name())) {
+                updatedChanges.put(
+                        APPSMITH_MAIL_SMTP_AUTH.name(),
+                        Boolean.toString(StringUtils.hasText(updatedChanges.get(APPSMITH_MAIL_USERNAME.name()))));
+            }
 
-        final List<String> outLines = envContent
-                .lines()
-                .map(line -> {
-                    final Matcher matcher = ENV_VARIABLE_PATTERN.matcher(line);
-                    if (!matcher.matches()) {
-                        return line;
-                    }
-                    final String name = matcher.group("name");
-                    return remainingChangedNames.remove(name)
-                            ? String.format("%s=%s", name, escapeForShell(changes.get(name)))
-                            : line;
-                })
-                .collect(Collectors.toList());
+            final Set<String> remainingChangedNames = new HashSet<>(updatedChanges.keySet());
 
-        for (final String name : remainingChangedNames) {
-            outLines.add(name + "=" + escapeForShell(changes.get(name)));
-        }
+            final List<String> outLines = envContent
+                    .lines()
+                    .map(line -> {
+                        final Matcher matcher = ENV_VARIABLE_PATTERN.matcher(line);
+                        if (!matcher.matches()) {
+                            return line;
+                        }
+                        final String name = matcher.group("name");
+                        return remainingChangedNames.remove(name)
+                                ? String.format("%s=%s", name, escapeForShell(updatedChanges.get(name)))
+                                : line;
+                    })
+                    .collect(Collectors.toList());
 
-        return outLines;
+            for (final String name : remainingChangedNames) {
+                outLines.add(name + "=" + escapeForShell(updatedChanges.get(name)));
+            }
+
+            return outLines;
+        });
     }
 
     private String escapeForShell(String input) {
@@ -263,7 +282,7 @@ public class EnvManagerCEImpl implements EnvManagerCE {
         return valueBuilder.toString();
     }
 
-    // Expect user object to be null when this method is getting called to run the tenant specific migrations without
+    // Expect user object to be null when this method is getting called to run the org specific migrations without
     // user context
     private Mono<Void> validateChanges(User user, Map<String, String> changes) {
         if (changes.containsKey(APPSMITH_ADMIN_EMAILS.name())) {
@@ -284,12 +303,12 @@ public class EnvManagerCEImpl implements EnvManagerCE {
     }
 
     /**
-     * This function returns a set of String based on the JsonProperty annotations in the TenantConfiguration class
+     * This function returns a set of String based on the JsonProperty annotations in the OrganizationConfiguration class
      *
      * @return
      */
-    private Set<String> allowedTenantConfiguration() {
-        return AppsmithBeanUtils.getAllFields(TenantConfiguration.class)
+    private Set<String> allowedOrganizationConfiguration() {
+        return AppsmithBeanUtils.getAllFields(OrganizationConfiguration.class)
                 .map(field -> {
                     JsonProperty jsonProperty = field.getDeclaredAnnotation(JsonProperty.class);
                     return jsonProperty == null ? field.getName() : jsonProperty.value();
@@ -298,77 +317,83 @@ public class EnvManagerCEImpl implements EnvManagerCE {
     }
 
     /**
-     * This function sets the value in the TenantConfiguration object based on the JsonProperty annotation of the field
+     * This function sets the value in the OrganizationConfiguration object based on the JsonProperty annotation of the field
      * The key must be exactly equal to the json annotation
      *
-     * @param tenantConfiguration
+     * @param organizationConfiguration
      * @param key
      * @param value
      */
-    private void setConfigurationByKey(TenantConfiguration tenantConfiguration, String key, String value) {
-        Stream<Field> fieldStream = AppsmithBeanUtils.getAllFields(TenantConfiguration.class);
+    private void setConfigurationByKey(OrganizationConfiguration organizationConfiguration, String key, String value) {
+        Stream<Field> fieldStream = AppsmithBeanUtils.getAllFields(OrganizationConfiguration.class);
         fieldStream.forEach(field -> {
             JsonProperty jsonProperty = field.getDeclaredAnnotation(JsonProperty.class);
             if (jsonProperty != null && jsonProperty.value().equals(key)) {
                 try {
                     field.setAccessible(true);
                     Object typedValue = ConvertUtils.convert(value, field.getType());
-                    field.set(tenantConfiguration, typedValue);
+                    field.set(organizationConfiguration, typedValue);
                 } catch (IllegalAccessException e) {
                     // Catch the error, log it and then do nothing.
                     log.error(
-                            "Got error while parsing the JSON annotations from TenantConfiguration class. Cause: ", e);
+                            "Got error while parsing the JSON annotations from OrganizationConfiguration class. Cause: ",
+                            e);
                 }
             } else if (field.getName().equals(key)) {
                 try {
                     field.setAccessible(true);
                     Object typedValue = ConvertUtils.convert(value, field.getType());
-                    field.set(tenantConfiguration, typedValue);
+                    field.set(organizationConfiguration, typedValue);
                 } catch (IllegalAccessException e) {
                     // Catch the error, log it and then do nothing.
-                    log.error("Got error while attempting to save property to TenantConfiguration class. Cause: ", e);
+                    log.error(
+                            "Got error while attempting to save property to OrganizationConfiguration class. Cause: ",
+                            e);
                 }
             }
         });
     }
 
-    private Mono<Tenant> updateTenantConfiguration(String tenantId, Map<String, String> changes) {
-        TenantConfiguration tenantConfiguration = new TenantConfiguration();
-        // Write the changes to the tenant collection in configuration field
+    private Mono<Organization> updateOrganizationConfiguration(String organizationId, Map<String, String> changes) {
+        OrganizationConfiguration organizationConfiguration = new OrganizationConfiguration();
+        // Write the changes to the organization collection in configuration field
         return Flux.fromIterable(changes.entrySet())
                 .map(map -> {
                     String key = map.getKey();
                     String value = map.getValue();
-                    setConfigurationByKey(tenantConfiguration, key, value);
+                    setConfigurationByKey(organizationConfiguration, key, value);
                     return map;
                 })
-                .then(Mono.just(tenantConfiguration))
-                .flatMap(updatedTenantConfig -> tenantService.updateTenantConfiguration(tenantId, tenantConfiguration));
+                .then(Mono.just(organizationConfiguration))
+                .flatMap(updatedOrganizationConfig ->
+                        organizationService.updateOrganizationConfiguration(organizationId, organizationConfiguration));
     }
 
+    // This flow is pertinent for any variables that need to change in the .env file or be saved in the organization
+    // configuration
     @Override
     public Mono<Void> applyChanges(Map<String, String> changes, String originHeader) {
-        // This flow is pertinent for any variables that need to change in the .env file or be saved in the tenant
-        // configuration
+        // Create a copy of the changes map to avoid modifying the original map and avoiding unsupported ops exception
+        // if the map is unmodifiable
+        Map<String, String> envChanges = new HashMap<>(changes);
         return verifyCurrentUserIsSuper()
-                .flatMap(user -> validateChanges(user, changes).thenReturn(user))
-                .flatMap(user -> applyChangesToEnvFileWithoutAclCheck(changes)
+                .flatMap(user -> validateChanges(user, envChanges).thenReturn(user))
+                .flatMap(user -> applyChangesToEnvFileWithoutAclCheck(envChanges)
+                        // Add the organization id to the context to be able to extract the feature flags
+                        .contextWrite(ctx -> ctx.put(ORGANIZATION_ID, user.getOrganizationId()))
                         // For configuration variables, save the variables to the config collection instead of .env file
                         // We ideally want to migrate all variables from .env file to the config collection for better
                         // scalability
-                        // Write the changes to the tenant collection in configuration field
-                        .flatMap(originalVariables -> updateTenantConfiguration(user.getTenantId(), changes)
-                                .then(sendAnalyticsEvent(user, originalVariables, changes))
+                        // Write the changes to the organization collection in configuration field
+                        .flatMap(originalVariables -> updateOrganizationConfiguration(
+                                        user.getOrganizationId(), envChanges)
+                                .then(sendAnalyticsEvent(user, originalVariables, envChanges))
                                 .thenReturn(originalVariables)))
                 .flatMap(originalValues -> {
                     Mono<Void> dependentTasks = Mono.empty();
 
                     // Try and update any at runtime, that can be.
-                    final Map<String, String> changesCopy = new HashMap<>(changes);
-
-                    if (changesCopy.containsKey(APPSMITH_SIGNUP_DISABLED.name())) {
-                        commonConfig.setSignupDisabled(changesCopy.remove(APPSMITH_SIGNUP_DISABLED.name()));
-                    }
+                    final Map<String, String> changesCopy = new HashMap<>(envChanges);
 
                     if (changesCopy.containsKey(APPSMITH_SIGNUP_ALLOWED_DOMAINS.name())) {
                         commonConfig.setAllowedDomainsString(
@@ -434,14 +459,11 @@ public class EnvManagerCEImpl implements EnvManagerCE {
     /**
      * This method applies the changes to the env file and should be called internally within the server as the ACL
      * checks are skipped. For client side calls please use {@link EnvManagerCEImpl#applyChanges(Map, String)}.
-     * Please refer {@link FeatureFlagMigrationHelper} for the use case where ACL checks
-     * should be skipped.
      *
      * @param changes       Map of changes to be applied to the env file
      * @return              Map of original variables before the changes were applied
      */
-    @Override
-    public Mono<Map<String, String>> applyChangesToEnvFileWithoutAclCheck(Map<String, String> changes) {
+    private Mono<Map<String, String>> applyChangesToEnvFileWithoutAclCheck(Map<String, String> changes) {
         final Path envFilePath = Path.of(commonConfig.getEnvFilePath());
         String originalContent;
         try {
@@ -453,21 +475,23 @@ public class EnvManagerCEImpl implements EnvManagerCE {
         Map<String, String> originalVariables = parseToMap(originalContent);
 
         final Map<String, String> envFileChanges = new HashMap<>(changes);
-        final Set<String> tenantConfigurationKeys = allowedTenantConfiguration();
+        final Set<String> organizationConfigurationKeys = allowedOrganizationConfiguration();
         for (final String key : changes.keySet()) {
-            if (tenantConfigurationKeys.contains(key)) {
+            if (organizationConfigurationKeys.contains(key)) {
                 envFileChanges.remove(key);
             }
         }
-        final List<String> changedContent = transformEnvContent(originalContent, envFileChanges);
-
-        try {
-            Files.write(envFilePath, changedContent);
-        } catch (IOException e) {
-            log.error("Unable to write to env file " + envFilePath, e);
-            return Mono.error(e);
-        }
-        return Mono.just(originalVariables);
+        return transformEnvContent(originalContent, envFileChanges)
+                .publishOn(Schedulers.boundedElastic())
+                .map(changedContent -> {
+                    try {
+                        Files.write(envFilePath, changedContent);
+                    } catch (IOException e) {
+                        log.error("Unable to write to env file " + envFilePath, e);
+                        throw new AppsmithException(AppsmithError.IO_ERROR, "Unable to write to env file");
+                    }
+                    return originalVariables;
+                });
     }
 
     @Override
@@ -606,7 +630,7 @@ public class EnvManagerCEImpl implements EnvManagerCE {
         Mono<Boolean> removedUsersMono = Flux.fromIterable(removedUsers)
                 .flatMap(userService::findByEmail)
                 .collectList()
-                .flatMap(userUtils::removeSuperUser);
+                .flatMap(userUtils::removeInstanceAdmin);
 
         Flux<Tuple2<User, Boolean>> usersFlux = Flux.fromIterable(newUsers)
                 .flatMap(email -> userService
@@ -639,7 +663,7 @@ public class EnvManagerCEImpl implements EnvManagerCE {
                 .map(results -> results.stream().allMatch(result -> result));
 
         Mono<Boolean> existingUsersMono = existingUsersWhichAreNotAlreadySuperUsersMono.flatMap(users -> userUtils
-                .makeSuperUser(users)
+                .makeInstanceAdministrator(users)
                 .flatMap(
                         success -> Flux.fromIterable(users)
                                 .flatMap(user -> sessionUserService
@@ -700,15 +724,20 @@ public class EnvManagerCEImpl implements EnvManagerCE {
      */
     @Override
     public Mono<Map<String, String>> getAllNonEmpty() {
-        return getAll().flatMap(map -> {
-            Map<String, String> nonEmptyValuesMap = new HashMap<>();
-            for (Map.Entry<String, String> entry : map.entrySet()) {
-                if (StringUtils.hasText(entry.getValue())) {
-                    nonEmptyValuesMap.put(entry.getKey(), entry.getValue());
-                }
-            }
-            return Mono.just(nonEmptyValuesMap);
-        });
+        return getAll().zipWith(organizationService.getCurrentUserOrganizationId())
+                .flatMap(tuple2 -> {
+                    Map<String, String> map = tuple2.getT1();
+                    String organizationId = tuple2.getT2();
+                    Map<String, String> nonEmptyValuesMap = new HashMap<>();
+                    Set<String> blacklistedEnvVariable =
+                            blacklistedEnvVariableHelper.getBlacklistedEnvVariableForAppsmithCloud(organizationId);
+                    for (Map.Entry<String, String> entry : map.entrySet()) {
+                        if (StringUtils.hasText(entry.getValue()) && !blacklistedEnvVariable.contains(entry.getKey())) {
+                            nonEmptyValuesMap.put(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    return Mono.just(nonEmptyValuesMap);
+                });
     }
 
     @Override

@@ -33,7 +33,7 @@ import type {
 import { BlueprintOperationTypes } from "WidgetProvider/constants";
 import IconSVG from "../icon.svg";
 import ThumbnailSVG from "../thumbnail.svg";
-import type { CanvasWidgetsReduxState } from "reducers/entityReducers/canvasWidgetsReducer";
+import type { CanvasWidgetsReduxState } from "ee/reducers/entityReducers/canvasWidgetsReducer";
 import { getWidgetBluePrintUpdates } from "utils/WidgetBlueprintUtils";
 import { DynamicHeight } from "utils/WidgetFeatures";
 import type { FlexLayer } from "layoutSystems/autolayout/utils/types";
@@ -525,6 +525,12 @@ export class ModalWidget extends BaseWidget<ModalWidgetProps, WidgetState> {
   };
 
   makeModalComponent() {
+    let children = this.props.children || [];
+
+    if (this.props.metaWidgetChildrenStructure?.length) {
+      children = this.props.metaWidgetChildrenStructure as WidgetProps[];
+    }
+
     return (
       <ModalComponent
         alignment={this.props.alignment}
@@ -534,7 +540,7 @@ export class ModalWidget extends BaseWidget<ModalWidgetProps, WidgetState> {
         className={`t--modal-widget ${generateClassName(this.props.widgetId)}`}
         height={this.props.height}
         isOpen={this.getModalVisibility()}
-        modalChildrenProps={this.props.children || []}
+        modalChildrenProps={children}
         onClose={this.closeModal}
         onModalClose={this.onModalClose}
         positioning={this.props.positioning}
@@ -571,6 +577,7 @@ export interface ModalWidgetProps extends WidgetProps {
   positioning?: Positioning;
   alignment: Alignment;
   spacing: Spacing;
+  isMetaWidget?: boolean;
 }
 
 export default ModalWidget;

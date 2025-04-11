@@ -38,14 +38,13 @@ import { getBetaFlag, setBetaFlag, STORAGE_KEYS } from "utils/storage";
 import type { UpdateWidgetPropertyPayload } from "actions/controlActions";
 import { batchUpdateMultipleWidgetProperties } from "actions/controlActions";
 import { getPropertiesToUpdateForReset } from "entities/AppTheming/utils";
-import type { CanvasWidgetsReduxState } from "reducers/entityReducers/canvasWidgetsReducer";
+import type { CanvasWidgetsReduxState } from "ee/reducers/entityReducers/canvasWidgetsReducer";
 import {
   getCurrentApplicationId,
   selectApplicationVersion,
 } from "selectors/editorSelectors";
 import { find } from "lodash";
 import * as Sentry from "@sentry/react";
-import { Severity } from "@sentry/react";
 import { getAllPageIdentities } from "./selectors";
 import type { SagaIterator } from "@redux-saga/types";
 import type { AxiosPromise } from "axios";
@@ -128,7 +127,7 @@ export function* fetchAppSelectedTheme(
       });
     } else {
       Sentry.captureException("Unable to fetch the selected theme", {
-        level: Severity.Critical,
+        level: "fatal",
         extra: {
           pageIdentities,
           applicationId,

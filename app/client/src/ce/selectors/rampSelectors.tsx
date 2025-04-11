@@ -11,10 +11,13 @@ import {
 } from "utils/ProductRamps/RampsControlList";
 import type { EnvTypes } from "utils/ProductRamps/RampTypes";
 import { isPermitted, PERMISSION_TYPE } from "ee/utils/permissionHelpers";
+import { selectFeatureFlags } from "./featureFlagsSelectors";
+import { isMultiOrgFFEnabled } from "ee/utils/planHelpers";
+import { WORKSPACE_SETTINGS_LICENSE_PAGE_URL } from "constants/routes";
 
 const { cloudHosting, customerPortalUrl, pricingUrl } = getAppsmithConfigs();
 
-const tenantState = (state: AppState) => state.tenant;
+const organizationState = (state: AppState) => state.organization;
 const uiState = (state: AppState) => state.ui;
 
 export const getRampLink = ({
@@ -26,21 +29,31 @@ export const getRampLink = ({
   feature: string;
   isBusinessFeature?: boolean;
 }) =>
-  createSelector(tenantState, (tenant) => {
-    const instanceId = tenant?.instanceId;
-    const source = cloudHosting ? "cloud" : "CE";
-    const RAMP_LINK_TO = isBusinessFeature
-      ? CUSTOMER_PORTAL_URL_WITH_PARAMS(
-          customerPortalUrl,
-          source,
-          instanceId,
-          feature,
-          section,
-        )
-      : PRICING_PAGE_URL(pricingUrl, source, instanceId, feature, section);
+  createSelector(
+    organizationState,
+    selectFeatureFlags,
+    (organization, featureFlags) => {
+      const instanceId = organization?.instanceId;
+      const source = cloudHosting ? "cloud" : "CE";
+      const isCloudBillingEnabled = isMultiOrgFFEnabled(featureFlags);
 
-    return RAMP_LINK_TO;
-  });
+      if (isCloudBillingEnabled) {
+        return WORKSPACE_SETTINGS_LICENSE_PAGE_URL;
+      }
+
+      const RAMP_LINK_TO = isBusinessFeature
+        ? CUSTOMER_PORTAL_URL_WITH_PARAMS(
+            customerPortalUrl,
+            source,
+            instanceId,
+            feature,
+            section,
+          )
+        : PRICING_PAGE_URL(pricingUrl, source, instanceId, feature, section);
+
+      return RAMP_LINK_TO;
+    },
+  );
 
 export const showProductRamps = (
   rampName: string,

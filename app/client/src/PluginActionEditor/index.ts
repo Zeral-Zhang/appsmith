@@ -3,7 +3,7 @@ export {
   PluginActionContextProvider,
   usePluginActionContext,
 } from "./PluginActionContext";
-export { default as PluginActionToolbar } from "./components/PluginActionToolbar";
+export { PluginActionToolbar } from "ee/PluginActionEditor/components/PluginActionToolbar";
 export { default as PluginActionForm } from "./components/PluginActionForm";
 export { default as PluginActionResponse } from "./components/PluginActionResponse";
 export type {
@@ -15,3 +15,5 @@ export { default as PluginActionNameEditor } from "./components/PluginActionName
 export type { PluginActionEditorState } from "./store/pluginEditorReducer";
 
 export { DocsMenuItem } from "./components/PluginActionToolbar/components/DocsMenuItem";
+
+export { default as DatasourceInfo } from "./components/PluginActionResponse/components/DatasourceTab/DatasourceInfo";

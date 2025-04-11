@@ -34,3 +34,16 @@ body,
 *:focus {
   outline: none;
 }
+
+.sb-unstyled {
+  background: none !important;
+}
+
+.docblock-argstable-body td {
+  background: none !important;
+}
+
+label[for="control-color-scheme"][aria-label="color-scheme"] > span {
+  font-size: 13px !important;
+  line-height: 18px;
+}

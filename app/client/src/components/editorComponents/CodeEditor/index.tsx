@@ -33,7 +33,7 @@ import type { WrappedFieldInputProps } from "redux-form";
 import _, { debounce, isEqual, isNumber } from "lodash";
 import scrollIntoView from "scroll-into-view-if-needed";
 
-import { ENTITY_TYPE } from "entities/DataTree/dataTreeFactory";
+import { ENTITY_TYPE } from "ee/entities/DataTree/types";
 import type { EvaluationSubstitutionType } from "ee/entities/DataTree/types";
 import type { DataTree } from "entities/DataTree/dataTreeTypes";
 import { Skin } from "constants/DefaultTheme";
@@ -260,6 +260,7 @@ export type EditorProps = EditorStyleProps &
     removeHoverAndFocusStyle?: boolean;
 
     customErrors?: LintError[];
+    highlightedLines?: number[]; // Array of line numbers to highlight
   };
 
 interface Props extends ReduxStateProps, EditorProps, ReduxDispatchProps {}
@@ -445,11 +446,11 @@ class CodeEditor extends Component<Props, State> {
         this: CodeEditor,
         editor: CodeMirror.Editor,
       ) {
-        // If you need to do something with the editor right after it’s been created,
+        // If you need to do something with the editor right after it's been created,
         // put that code here.
         //
         // This helps with performance: finishInit() is called inside
-        // CodeMirror’s `operation()` (https://codemirror.net/doc/manual.html#operation
+        // CodeMirror's `operation()` (https://codemirror.net/doc/manual.html#operation
         // which means CodeMirror recalculates itself only one time, once all CodeMirror
         // changes here are completed
         //
@@ -500,7 +501,13 @@ class CodeEditor extends Component<Props, State> {
 
       // Finally create the Codemirror editor
       this.editor = CodeMirror(this.codeEditorTarget.current, options);
-      // DO NOT ADD CODE BELOW. If you need to do something with the editor right after it’s created,
+
+      // Add highlighting for initial render
+      if (this.props.highlightedLines?.length) {
+        this.updateLineHighlighting(this.props.highlightedLines);
+      }
+
+      // DO NOT ADD CODE BELOW. If you need to do something with the editor right after it's created,
       // put that code into `options.finishInit()`.
     }
 
@@ -610,6 +617,11 @@ class CodeEditor extends Component<Props, State> {
           }
         }, 200);
       }
+    }
+
+    // Check if highlighted lines have changed
+    if (!isEqual(prevProps.highlightedLines, this.props.highlightedLines)) {
+      this.updateLineHighlighting(this.props.highlightedLines || []);
     }
 
     this.editor.operation(() => {
@@ -1632,6 +1644,21 @@ class CodeEditor extends Component<Props, State> {
 
     this.props.input?.onChange?.(value);
     this.editor.setValue(value);
+  };
+
+  // Add new method to handle line highlighting
+  private updateLineHighlighting = (lines: number[]) => {
+    // Clear existing highlights
+    for (let i = 0; i < this.editor.lineCount(); i++) {
+      this.editor.removeLineClass(i, "background", "highlighted-line");
+    }
+
+    // Add new highlights
+    lines.forEach((lineNumber) => {
+      if (lineNumber >= 0 && lineNumber < this.editor.lineCount()) {
+        this.editor.addLineClass(lineNumber, "background", "highlighted-line");
+      }
+    });
   };
 
   render() {

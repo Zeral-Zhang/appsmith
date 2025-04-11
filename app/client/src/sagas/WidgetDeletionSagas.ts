@@ -25,7 +25,7 @@ import { flattenDeep, omit, orderBy } from "lodash";
 import type {
   CanvasWidgetsReduxState,
   FlattenedWidgetProps,
-} from "reducers/entityReducers/canvasWidgetsReducer";
+} from "ee/reducers/entityReducers/canvasWidgetsReducer";
 import { all, call, put, select, takeEvery } from "redux-saga/effects";
 import { SelectionRequestType } from "sagas/WidgetSelectUtils";
 import {
@@ -386,10 +386,14 @@ function* deleteAllSelectedWidgetsSaga(
     const widgets = { ...stateWidgets };
     const selectedWidgets: string[] = yield select(getSelectedWidgets);
 
-    if (!(selectedWidgets && selectedWidgets.length !== 1)) return;
+    const deletableWidgets = selectedWidgets.filter(
+      (widgetId) => widgets[widgetId]?.isDeletable !== false,
+    );
+
+    if (!(deletableWidgets && deletableWidgets.length !== 1)) return;
 
     const widgetsToBeDeleted: WidgetsInTree = yield all(
-      selectedWidgets.map((eachId) => {
+      deletableWidgets.map((eachId) => {
         return call(getAllWidgetsInTree, eachId, widgets);
       }),
     );

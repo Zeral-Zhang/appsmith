@@ -11,11 +11,12 @@ import java.util.Set;
 
 public interface UserRepositoryCE extends BaseRepository<User, String>, CustomUserRepository {
 
+    @Deprecated
     Mono<User> findByEmail(String email);
 
-    Mono<User> findFirstByEmailIgnoreCaseOrderByCreatedAtDesc(String email);
+    Mono<User> findFirstByEmailIgnoreCaseAndOrganizationIdOrderByCreatedAtDesc(String email, String organizationId);
 
-    Flux<User> findAllByEmailIn(Set<String> emails);
+    Flux<User> findAllByEmailInAndOrganizationId(Set<String> emails, String organizationId);
 
     /**
      * This method returns the count of all users that are not deleted and are not system generated.
@@ -29,5 +30,5 @@ public interface UserRepositoryCE extends BaseRepository<User, String>, CustomUs
     Mono<Long> countByDeletedAtIsNullAndLastActiveAtGreaterThanAndIsSystemGeneratedIsNot(
             Instant lastActiveAt, Boolean excludeSystemGenerated);
 
-    Mono<User> findByEmailAndTenantId(String email, String tenantId);
+    Mono<User> findByEmailAndOrganizationId(String email, String organizationId);
 }

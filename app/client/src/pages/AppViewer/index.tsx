@@ -47,9 +47,8 @@ import {
   ThemeProvider as WDSThemeProvider,
   useTheme,
 } from "@appsmith/wds-theming";
-import { KBViewerFloatingButton } from "ee/pages/AppViewer/KnowledgeBase/KBViewerFloatingButton";
 import urlBuilder from "ee/entities/URLRedirect/URLAssembly";
-import { getHideWatermark } from "ee/selectors/tenantSelectors";
+import { getHideWatermark } from "ee/selectors/organizationSelectors";
 import { getIsAnvilLayout } from "layoutSystems/anvil/integrations/selectors";
 
 const AppViewerBody = styled.section<{
@@ -61,7 +60,7 @@ const AppViewerBody = styled.section<{
   flex-direction: row;
   align-items: stretch;
   justify-content: flex-start;
-  height: calc(100vh - ${({ headerHeight }) => headerHeight}px);
+  height: calc(100dvh - ${({ headerHeight }) => headerHeight}px);
   --view-mode-header-height: ${({ headerHeight }) => headerHeight}px;
   contain: ${({ $contain }) => $contain};
 `;
@@ -245,7 +244,6 @@ function AppViewer(props: Props) {
                 <BrandingBadge />
               </a>
             )}
-            <KBViewerFloatingButton />
           </div>
         </AppViewerBodyContainer>
       </EditorContextProvider>

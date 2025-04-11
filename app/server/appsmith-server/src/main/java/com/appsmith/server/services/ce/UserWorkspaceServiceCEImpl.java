@@ -13,9 +13,9 @@ import com.appsmith.server.exceptions.AppsmithError;
 import com.appsmith.server.exceptions.AppsmithException;
 import com.appsmith.server.helpers.AppsmithComparators;
 import com.appsmith.server.repositories.UserRepository;
+import com.appsmith.server.services.OrganizationService;
 import com.appsmith.server.services.PermissionGroupService;
 import com.appsmith.server.services.SessionUserService;
-import com.appsmith.server.services.TenantService;
 import com.appsmith.server.services.UserDataService;
 import com.appsmith.server.services.WorkspaceService;
 import com.appsmith.server.solutions.PermissionGroupPermission;
@@ -41,6 +41,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.appsmith.server.helpers.ce.DomainSorter.sortDomainsBasedOnOrderedDomainIds;
+import static java.lang.Boolean.TRUE;
 
 @Slf4j
 @Service
@@ -50,7 +51,7 @@ public class UserWorkspaceServiceCEImpl implements UserWorkspaceServiceCE {
     private final UserRepository userRepository;
     private final UserDataService userDataService;
     private final PermissionGroupService permissionGroupService;
-    private final TenantService tenantService;
+    private final OrganizationService organizationService;
     private final WorkspacePermission workspacePermission;
     private final PermissionGroupPermission permissionGroupPermission;
 
@@ -61,7 +62,7 @@ public class UserWorkspaceServiceCEImpl implements UserWorkspaceServiceCE {
             UserRepository userRepository,
             UserDataService userDataService,
             PermissionGroupService permissionGroupService,
-            TenantService tenantService,
+            OrganizationService organizationService,
             WorkspacePermission workspacePermission,
             PermissionGroupPermission permissionGroupPermission) {
         this.sessionUserService = sessionUserService;
@@ -69,7 +70,7 @@ public class UserWorkspaceServiceCEImpl implements UserWorkspaceServiceCE {
         this.userRepository = userRepository;
         this.userDataService = userDataService;
         this.permissionGroupService = permissionGroupService;
-        this.tenantService = tenantService;
+        this.organizationService = organizationService;
         this.workspacePermission = workspacePermission;
         this.permissionGroupPermission = permissionGroupPermission;
     }
@@ -147,9 +148,10 @@ public class UserWorkspaceServiceCEImpl implements UserWorkspaceServiceCE {
                 .cache();
 
         // Get the user
-        Mono<User> userMono = tenantService
-                .getDefaultTenantId()
-                .flatMap(tenantId -> userRepository.findByEmailAndTenantId(changeUserGroupDTO.getUsername(), tenantId))
+        Mono<User> userMono = organizationService
+                .getCurrentUserOrganizationId()
+                .flatMap(organizationId ->
+                        userRepository.findByEmailAndOrganizationId(changeUserGroupDTO.getUsername(), organizationId))
                 .switchIfEmpty(Mono.error(new AppsmithException(
                         AppsmithError.NO_RESOURCE_FOUND, FieldName.USER, changeUserGroupDTO.getUsername())))
                 .cache();
@@ -164,8 +166,11 @@ public class UserWorkspaceServiceCEImpl implements UserWorkspaceServiceCE {
                 .switchIfEmpty(Mono.error(new AppsmithException(
                         AppsmithError.ACTION_IS_NOT_AUTHORIZED, "Change permissionGroup of a member")))
                 .single()
-                .flatMap(permissionGroup -> {
-                    if (this.isLastAdminRoleEntity(permissionGroup)) {
+                .zipWhen(permissionGroup -> isLastAdminRoleEntity(permissionGroup))
+                .flatMap(tuple2 -> {
+                    PermissionGroup permissionGroup = tuple2.getT1();
+                    Boolean isLastAdminRoleEntity = tuple2.getT2();
+                    if (TRUE.equals(isLastAdminRoleEntity)) {
                         return Mono.error(new AppsmithException(AppsmithError.REMOVE_LAST_WORKSPACE_ADMIN_ERROR));
                     }
                     return Mono.just(permissionGroup);
@@ -382,9 +387,9 @@ public class UserWorkspaceServiceCEImpl implements UserWorkspaceServiceCE {
     }
 
     @Override
-    public Boolean isLastAdminRoleEntity(PermissionGroup permissionGroup) {
-        return permissionGroup.getName().startsWith(FieldName.ADMINISTRATOR)
-                && permissionGroup.getAssignedToUserIds().size() == 1;
+    public Mono<Boolean> isLastAdminRoleEntity(PermissionGroup permissionGroup) {
+        return Mono.just(permissionGroup.getName().startsWith(FieldName.ADMINISTRATOR)
+                && permissionGroup.getAssignedToUserIds().size() == 1);
     }
 
     /**
@@ -393,7 +398,7 @@ public class UserWorkspaceServiceCEImpl implements UserWorkspaceServiceCE {
      * @return Mono of list of workspaces
      */
     @Override
-    public Mono<List<Workspace>> getUserWorkspacesByRecentlyUsedOrder(String hostname) {
+    public Mono<List<Workspace>> getUserWorkspacesByRecentlyUsedOrder() {
 
         Mono<List<String>> workspaceIdsMono = userDataService
                 .getForCurrentUser()

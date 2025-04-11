@@ -3,15 +3,16 @@ package com.appsmith.server.services.ce_compatible;
 import com.appsmith.server.configurations.CommonConfig;
 import com.appsmith.server.helpers.UserServiceHelper;
 import com.appsmith.server.helpers.UserUtils;
+import com.appsmith.server.instanceconfigs.helpers.InstanceVariablesHelper;
 import com.appsmith.server.ratelimiting.RateLimitService;
 import com.appsmith.server.repositories.EmailVerificationTokenRepository;
 import com.appsmith.server.repositories.PasswordResetTokenRepository;
 import com.appsmith.server.repositories.UserRepository;
 import com.appsmith.server.services.AnalyticsService;
 import com.appsmith.server.services.EmailService;
+import com.appsmith.server.services.OrganizationService;
 import com.appsmith.server.services.PACConfigurationService;
 import com.appsmith.server.services.SessionUserService;
-import com.appsmith.server.services.TenantService;
 import com.appsmith.server.services.UserDataService;
 import com.appsmith.server.services.WorkspaceService;
 import com.appsmith.server.services.ce.UserServiceCEImpl;
@@ -31,13 +32,14 @@ public class UserServiceCECompatibleImpl extends UserServiceCEImpl implements Us
             PasswordEncoder passwordEncoder,
             CommonConfig commonConfig,
             UserDataService userDataService,
-            TenantService tenantService,
+            OrganizationService organizationService,
             UserUtils userUtils,
             EmailVerificationTokenRepository emailVerificationTokenRepository,
             EmailService emailService,
             RateLimitService rateLimitService,
             PACConfigurationService pacConfigurationService,
-            UserServiceHelper userServiceHelper) {
+            UserServiceHelper userServiceHelper,
+            InstanceVariablesHelper instanceVariablesHelper) {
         super(
                 validator,
                 repository,
@@ -48,12 +50,13 @@ public class UserServiceCECompatibleImpl extends UserServiceCEImpl implements Us
                 passwordEncoder,
                 commonConfig,
                 userDataService,
-                tenantService,
+                organizationService,
                 userUtils,
                 emailVerificationTokenRepository,
                 emailService,
                 rateLimitService,
                 pacConfigurationService,
-                userServiceHelper);
+                userServiceHelper,
+                instanceVariablesHelper);
     }
 }

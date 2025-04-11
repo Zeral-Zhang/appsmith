@@ -7,8 +7,10 @@ import {
   getDynamicStringSegments,
   isDynamicValue,
 } from "utils/DynamicBindingUtils";
-import type { FieldEntityInformation } from "components/editorComponents/CodeEditor/EditorConfig";
-import { ENTITY_TYPE } from "entities/DataTree/dataTreeFactory";
+import {
+  EditorModes,
+  type FieldEntityInformation,
+} from "components/editorComponents/CodeEditor/EditorConfig";
 import type { EntityTypeValue } from "ee/entities/DataTree/types";
 import { AutocompleteSorter } from "./AutocompleteSortRules";
 import { getCompletionsForKeyword } from "./keywordCompletion";
@@ -21,6 +23,7 @@ import {
 import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import { findIndex, isString } from "lodash";
 import { renderTernTooltipContent } from "./ternDocTooltip";
+import { checkIfCursorInsideBinding } from "components/editorComponents/CodeEditor/codeEditorUtils";
 
 const bigDoc = 250;
 const cls = "CodeMirror-Tern-";
@@ -516,6 +519,8 @@ class CodeMirrorTernService {
     const lineValue = this.lineValue(doc);
     const cursor = cm.getCursor();
     const { extraChars } = this.getFocusedDocValueAndPos(doc);
+    const fieldIsJSField =
+      this.fieldEntityInformation.mode === EditorModes.JAVASCRIPT;
 
     let completions: Completion<TernCompletionResult>[] = [];
     let after = "";
@@ -550,6 +555,7 @@ class CodeMirrorTernService {
 
       if (typeof completion === "string") continue;
 
+      const isCursorInsideBinding = checkIfCursorInsideBinding(cm);
       const isKeyword = isCustomKeywordType(completion);
       const className = typeToIcon(completion.type as string, isKeyword);
       const dataType = getDataType(completion.type as string);
@@ -588,6 +594,11 @@ class CodeMirrorTernService {
         recencyWeight,
         isEntityName: isCompletionADataTreeEntityName,
       };
+
+      if (!isCursorInsideBinding && !fieldIsJSField) {
+        codeMirrorCompletion.displayText = `{{${codeMirrorCompletion.displayText}}}`;
+        codeMirrorCompletion.text = `{{${codeMirrorCompletion.text}}}`;
+      }
 
       if (isKeyword) {
         codeMirrorCompletion.render = (
@@ -630,16 +641,13 @@ class CodeMirrorTernService {
       completions.push(codeMirrorCompletion);
     }
 
-    const shouldComputeBestMatch =
-      this.fieldEntityInformation.entityType !== ENTITY_TYPE.JSACTION;
-
     completions = AutocompleteSorter.sort(
       completions,
       { ...this.fieldEntityInformation, token },
       this.defEntityInformation.get(
         this.fieldEntityInformation.entityName || "",
       ),
-      shouldComputeBestMatch,
+      !fieldIsJSField,
     );
     const indexToBeSelected =
       completions.length && completions[0].isHeader ? 1 : 0;
@@ -747,12 +755,22 @@ class CodeMirrorTernService {
         libraryNamespace: selected.origin?.split("/")[1],
       });
 
+      // Check if the completion ends with parentheses () or closing brackets }}
       const hasParenthesis = selected.text.endsWith("()");
+      const endsWithBindingBrackets = selected.text.endsWith("}}");
 
+      // Position cursor handling:
+      // 1. For functions - place cursor between parentheses e.g. myFunction(|)
+      // 2. For completions with }} - place cursor before }} e.g. {{Api1.data|}}
       if (selected.type === AutocompleteDataType.FUNCTION && hasParenthesis) {
         cm.setCursor({
           line: cm.getCursor().line,
           ch: cm.getCursor().ch - 1,
+        });
+      } else if (endsWithBindingBrackets) {
+        cm.setCursor({
+          line: cm.getCursor().line,
+          ch: cm.getCursor().ch - 2,
         });
       }
     });
@@ -1359,17 +1377,17 @@ class CodeMirrorTernService {
     const CodeMirror = getCodeMirrorNamespaceFromDoc(cm.getDoc());
     const inner = CodeMirror.innerMode(cm.getMode(), state);
 
-    if (inner.mode.name != "javascript") return false;
+    if (inner.mode.name === "javascript") {
+      const lex = inner.state.lexical;
 
-    const lex = inner.state.lexical;
+      if (lex.info === "call") {
+        const argPos = lex.pos || 0;
+        const args = this.cachedArgHints?.type?.args || [];
+        const arg = args[argPos];
+        const argType = arg?.type;
 
-    if (lex.info === "call") {
-      const argPos = lex.pos || 0;
-      const args = this.cachedArgHints?.type?.args || [];
-      const arg = args[argPos];
-      const argType = arg?.type;
-
-      entityInformation.expectedType = getDataType(argType);
+        entityInformation.expectedType = getDataType(argType);
+      }
     }
 
     this.fieldEntityInformation = entityInformation;
@@ -1397,6 +1415,7 @@ class CodeMirrorTernService {
 
     return query;
   }
+
   updateRecentEntities(recentEntities: string[]) {
     this.recentEntities = recentEntities;
   }

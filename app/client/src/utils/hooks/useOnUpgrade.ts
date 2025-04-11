@@ -1,5 +1,5 @@
 import { useSelector } from "react-redux";
-import { getInstanceId } from "ee/selectors/tenantSelectors";
+import { getInstanceId } from "ee/selectors/organizationSelectors";
 import {
   CUSTOMER_PORTAL_URL_WITH_PARAMS,
   PRICING_PAGE_URL,
@@ -12,6 +12,8 @@ import type {
   RampFeature,
   RampSection,
 } from "utils/ProductRamps/RampsControlList";
+import { useIsCloudBillingEnabled } from "hooks";
+import { WORKSPACE_SETTINGS_LICENSE_PAGE_URL } from "constants/routes";
 
 interface Props {
   logEventName?: EventName;
@@ -28,6 +30,7 @@ const useOnUpgrade = (props: Props) => {
     props;
   const instanceId = useSelector(getInstanceId);
   const appsmithConfigs = getAppsmithConfigs();
+  const isCloudBillingEnabled = useIsCloudBillingEnabled();
 
   const onUpgrade = () => {
     AnalyticsUtil.logEvent(
@@ -45,6 +48,8 @@ const useOnUpgrade = (props: Props) => {
           sectionName,
         ),
       );
+    } else if (isCloudBillingEnabled) {
+      window.open(WORKSPACE_SETTINGS_LICENSE_PAGE_URL, "_blank");
     } else {
       window.open(
         CUSTOMER_PORTAL_URL_WITH_PARAMS(

@@ -4,7 +4,7 @@ import memoize from "proxy-memoize";
 import type {
   CanvasWidgetsReduxState,
   FlattenedWidgetProps,
-} from "reducers/entityReducers/canvasWidgetsReducer";
+} from "ee/reducers/entityReducers/canvasWidgetsReducer";
 import type { WidgetProps } from "widgets/BaseWidget";
 import _, { defaults, omit } from "lodash";
 import type { WidgetType } from "constants/WidgetConstants";
@@ -13,7 +13,6 @@ import type { ActionData } from "ee/reducers/entityReducers/actionsReducer";
 import type { Page } from "entities/Page";
 import { getActions, getPlugins } from "ee/selectors/entitiesSelector";
 import type { Plugin } from "entities/Plugin";
-import type { DragDetails } from "reducers/uiReducers/dragResizeReducer";
 import type { DataTreeForActionCreator } from "components/editorComponents/ActionCreator/types";
 import type { MetaWidgetsReduxState } from "reducers/entityReducers/metaWidgetsReducer";
 
@@ -73,11 +72,22 @@ export const getWidget = (state: AppState, widgetId: string): WidgetProps => {
   return state.entities.canvasWidgets[widgetId];
 };
 
-export const getWidgetIdsByType = (state: AppState, type: WidgetType) => {
-  return Object.values(state.entities.canvasWidgets)
-    .filter((widget: FlattenedWidgetProps) => widget.type === type)
-    .map((widget: FlattenedWidgetProps) => widget.widgetId);
-};
+export const getWidgetIdsByType = createSelector(
+  getWidgets,
+  getMetaWidgets,
+  (_state: AppState, widgetType: WidgetType) => widgetType,
+  (canvasWidgets, metaWidgets, widgetType) => {
+    const canvasWidgetIds = Object.values(canvasWidgets)
+      .filter((widget: FlattenedWidgetProps) => widget.type === widgetType)
+      .map((widget: FlattenedWidgetProps) => widget.widgetId);
+
+    const metaWidgetIds = Object.values(metaWidgets)
+      .filter((widget: FlattenedWidgetProps) => widget.type === widgetType)
+      .map((widget: FlattenedWidgetProps) => widget.widgetId);
+
+    return [...canvasWidgetIds, ...metaWidgetIds];
+  },
+);
 
 export const getAllDetachedWidgetIds = memoize(
   (canvasWidgets: CanvasWidgetsReduxState) => {
@@ -188,17 +198,26 @@ export const getExistingPageNames = (state: AppState) => {
   return map;
 };
 
-export const getWidgetByName = (
-  state: AppState,
-  widgetName: string,
-): FlattenedWidgetProps | undefined => {
-  const widgets = state.entities.canvasWidgets;
+export const getWidgetByName = createSelector(
+  getWidgets,
+  getMetaWidgets,
+  (state: AppState, widgetName: string) => widgetName,
+  (widgets, metaWidgets, widgetName) => {
+    for (const widget of Object.values(widgets)) {
+      if (widget.widgetName === widgetName) {
+        return widget;
+      }
+    }
 
-  return _.find(
-    Object.values(widgets),
-    (widget) => widget.widgetName === widgetName,
-  );
-};
+    for (const widget of Object.values(metaWidgets)) {
+      if (widget.widgetName === widgetName) {
+        return widget;
+      }
+    }
+
+    return null;
+  },
+);
 
 export const getAllPageIdentities = (state: AppState) => {
   return state.entities.pageList.pages.map((page) => ({
@@ -228,7 +247,7 @@ export const getIsNewWidgetBeingDragged = (state: AppState) => {
 
   if (!isDragging) return false;
 
-  const dragDetails: DragDetails = getDragDetails(state);
+  const dragDetails = getDragDetails(state);
   const { dragGroupActualParent: dragParent, newWidget } = dragDetails;
 
   return !!newWidget && !dragParent;
@@ -238,7 +257,7 @@ export const isCurrentCanvasDragging = createSelector(
   (state: AppState) => state.ui.widgetDragResize.isDragging,
   getDragDetails,
   (state: AppState, canvasId: string) => canvasId,
-  (isDragging: boolean, dragDetails: DragDetails, canvasId: string) => {
+  (isDragging: boolean, dragDetails, canvasId: string) => {
     return dragDetails?.draggedOn === canvasId && isDragging;
   },
 );

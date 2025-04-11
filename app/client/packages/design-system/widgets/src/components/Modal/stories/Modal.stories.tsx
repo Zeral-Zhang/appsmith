@@ -1,4 +1,4 @@
-import React from "react";
+import React, { type FunctionComponent } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { Modal } from "@appsmith/wds";
 import { ModalHeader, ModalFooter, ModalContent } from "@appsmith/wds";
@@ -15,12 +15,9 @@ const meta: Meta<typeof Modal> = {
   component: Modal,
   title: "WDS/Widgets/Modal",
   subcomponents: {
-    //@ts-expect-error: don't need props to pass here
-    ModalHeader,
-    //@ts-expect-error: don't need props to pass here
-    ModalFooter,
-    //@ts-expect-error: don't need props to pass here
-    ModalContent,
+    ModalHeader: ModalHeader as FunctionComponent<unknown>,
+    ModalFooter: ModalFooter as FunctionComponent<unknown>,
+    ModalContent: ModalContent as FunctionComponent<unknown>,
   },
   render: () => <SimpleModal />,
 };

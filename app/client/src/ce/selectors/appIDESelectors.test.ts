@@ -1,5 +1,5 @@
-import type { EntityItem } from "ee/entities/IDE/constants";
-import { groupAndSortEntitySegmentList } from "./appIDESelectors";
+import type { EntityItem } from "ee/IDE/Interfaces/EntityItem";
+import { groupAndSortEntitySegmentList } from "IDE/utils/groupAndSortEntitySegmentList";
 import { PluginType } from "entities/Plugin";
 
 describe("groupAndSortEntitySegmentList", () => {

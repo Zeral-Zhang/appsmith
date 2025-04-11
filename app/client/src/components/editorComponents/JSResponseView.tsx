@@ -32,7 +32,8 @@ import {
 import { getJsPaneDebuggerState } from "selectors/jsPaneSelectors";
 import { setJsPaneDebuggerState } from "actions/jsPaneActions";
 import { getIDEViewMode } from "selectors/ideSelectors";
-import { EditorViewMode, IDE_TYPE } from "ee/entities/IDE/constants";
+import { EditorViewMode } from "IDE/Interfaces/EditorTypes";
+import { IDE_TYPE } from "ee/IDE/Interfaces/IDETypes";
 import ErrorLogs from "./Debugger/Errors";
 import { isBrowserExecutionAllowed } from "ee/utils/actionExecutionUtils";
 import JSRemoteExecutionView from "ee/components/JSRemoteExecutionView";
@@ -215,12 +216,16 @@ function JSResponseView(props: Props) {
   const ideType = getIDETypeByUrl(location.pathname);
 
   const tabs = useMemo(() => {
-    const jsTabs: BottomTab[] = [
+    const responseTabs: BottomTab[] = [
       {
         key: DEBUGGER_TAB_KEYS.RESPONSE_TAB,
         title: createMessage(DEBUGGER_RESPONSE),
         panelComponent: JSResponseTab,
       },
+    ];
+
+    const jsTabs: BottomTab[] = [
+      ...responseTabs,
       {
         key: DEBUGGER_TAB_KEYS.LOGS_TAB,
         title: createMessage(DEBUGGER_LOGS),

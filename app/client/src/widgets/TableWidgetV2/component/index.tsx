@@ -1,19 +1,20 @@
 import React from "react";
-import Table from "./Table";
-import type {
-  AddNewRowActions,
-  CompactMode,
-  ReactTableColumnProps,
-  ReactTableFilter,
-  StickyType,
-} from "./Constants";
 import type { Row } from "react-table";
+import {
+  CompactModeTypes,
+  type AddNewRowActions,
+  type CompactMode,
+  type ReactTableColumnProps,
+  type ReactTableFilter,
+  type StickyType,
+} from "./Constants";
+import Table from "./Table";
 
 import type { EventType } from "constants/AppsmithActionConstants/ActionConstants";
 import equal from "fast-deep-equal/es6";
+import { useCallback } from "react";
 import type { EditableCell, TableVariant } from "../constants";
 import { ColumnTypes } from "../constants";
-import { useCallback } from "react";
 
 export interface ColumnMenuOptionProps {
   content: string | JSX.Element;
@@ -106,6 +107,8 @@ interface ReactTableComponentProps {
   canFreezeColumn?: boolean;
   showConnectDataOverlay: boolean;
   onConnectData: () => void;
+  isInfiniteScrollEnabled: boolean;
+  endOfData: boolean;
 }
 
 function ReactTableComponent(props: ReactTableComponentProps) {
@@ -117,7 +120,6 @@ function ReactTableComponent(props: ReactTableComponentProps) {
     borderColor,
     borderWidth,
     canFreezeColumn,
-    columns,
     columnWidthMap,
     compactMode,
     delimiter,
@@ -125,12 +127,14 @@ function ReactTableComponent(props: ReactTableComponentProps) {
     disableDrag,
     editableCell,
     editMode,
+    endOfData,
     filters,
     handleColumnFreeze,
     handleReorderColumn,
     handleResizeColumn,
     height,
     isAddRowInProgress,
+    isInfiniteScrollEnabled,
     isLoading,
     isSortable,
     isVisibleDownload,
@@ -167,6 +171,16 @@ function ReactTableComponent(props: ReactTableComponentProps) {
     widgetName,
     width,
   } = props;
+
+  let columns = props.columns;
+
+  if (isInfiniteScrollEnabled) {
+    const regularColumns = columns.filter(
+      (col) => col.columnProperties?.columnType !== ColumnTypes.EDIT_ACTIONS,
+    );
+
+    columns = [...regularColumns];
+  }
 
   const sortTableColumn = useCallback(
     (columnIndex: number, asc: boolean) => {
@@ -232,7 +246,7 @@ function ReactTableComponent(props: ReactTableComponentProps) {
       canFreezeColumn={canFreezeColumn}
       columnWidthMap={columnWidthMap}
       columns={columns}
-      compactMode={compactMode}
+      compactMode={compactMode || CompactModeTypes.DEFAULT}
       data={tableData}
       delimiter={delimiter}
       disableDrag={memoziedDisableDrag}
@@ -240,12 +254,14 @@ function ReactTableComponent(props: ReactTableComponentProps) {
       editMode={editMode}
       editableCell={editableCell}
       enableDrag={memoziedEnableDrag}
+      endOfData={endOfData}
       filters={filters}
       handleColumnFreeze={handleColumnFreeze}
       handleReorderColumn={handleReorderColumn}
       handleResizeColumn={handleResizeColumn}
       height={height}
       isAddRowInProgress={isAddRowInProgress}
+      isInfiniteScrollEnabled={isInfiniteScrollEnabled}
       isLoading={isLoading}
       isSortable={isSortable}
       isVisibleDownload={isVisibleDownload}
@@ -339,6 +355,7 @@ export default React.memo(ReactTableComponent, (prev, next) => {
     prev.allowSorting === next.allowSorting &&
     prev.disabledAddNewRowSave === next.disabledAddNewRowSave &&
     prev.canFreezeColumn === next.canFreezeColumn &&
-    prev.showConnectDataOverlay === next.showConnectDataOverlay
+    prev.showConnectDataOverlay === next.showConnectDataOverlay &&
+    prev.isInfiniteScrollEnabled === next.isInfiniteScrollEnabled
   );
 });

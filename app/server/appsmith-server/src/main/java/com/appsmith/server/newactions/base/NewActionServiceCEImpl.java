@@ -795,7 +795,7 @@ public class NewActionServiceCEImpl extends BaseService<NewActionRepository, New
 
     @Override
     public Mono<ActionDTO> deleteUnpublishedAction(String id) {
-        return deleteUnpublishedAction(id, actionPermission.getDeletePermission());
+        return actionPermission.getDeletePermission().flatMap(permission -> deleteUnpublishedAction(id, permission));
     }
 
     @Override
@@ -1480,7 +1480,9 @@ public class NewActionServiceCEImpl extends BaseService<NewActionRepository, New
             List<String> unpublishedPages, Optional<AclPermission> optionalPermission) {
         return repository.findByPageIds(unpublishedPages, optionalPermission).doOnNext(newAction -> {
             this.setCommonFieldsFromNewActionIntoAction(newAction, newAction.getUnpublishedAction());
-            this.setCommonFieldsFromNewActionIntoAction(newAction, newAction.getPublishedAction());
+            if (newAction.getPublishedAction() != null) {
+                this.setCommonFieldsFromNewActionIntoAction(newAction, newAction.getPublishedAction());
+            }
         });
     }
 
@@ -1526,5 +1528,15 @@ public class NewActionServiceCEImpl extends BaseService<NewActionRepository, New
     public Flux<NewAction> findByCollectionIdAndViewMode(
             String collectionId, boolean viewMode, AclPermission aclPermission) {
         return repository.findAllByCollectionIds(List.of(collectionId), viewMode, aclPermission);
+    }
+
+    @Override
+    public Mono<Void> postProcessNewlyAddedActions(List<ActionDTO> newlyAddedActions) {
+        return Mono.empty().then();
+    }
+
+    @Override
+    public Mono<Void> postProcessDeletedActions(List<ActionDTO> actionDTOs) {
+        return Mono.empty().then();
     }
 }

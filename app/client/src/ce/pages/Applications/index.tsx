@@ -8,18 +8,17 @@ import {
 } from "ee/actions/workspaceActions";
 import type { UpdateApplicationPayload } from "ee/api/ApplicationApi";
 import {
-  ANVIL_APPLICATIONS,
+  AI_AGENTS_APPLICATIONS,
+  AI_APPLICATION_CARD_LIST_ZERO_STATE,
   APPLICATIONS,
-  CLASSIC_APPLICATION_CARD_LIST_ZERO_STATE,
   CREATE_A_NEW_WORKSPACE,
   createMessage,
-  FIXED_APPLICATIONS,
   INVITE_USERS_PLACEHOLDER,
-  NEW_APPLICATION_CARD_LIST_ZERO_STATE,
   NO_APPS_FOUND,
   NO_WORKSPACE_HEADING,
   WORKSPACES_HEADING,
 } from "ee/constants/messages";
+import { getIsAiAgentFlowEnabled } from "ee/selectors/aiAgentSelectors";
 import type { ApplicationPayload } from "entities/Application";
 import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
 import { createWorkspaceSubmitHandler } from "ee/pages/workspace/helpers";
@@ -97,9 +96,9 @@ import {
   getIsFetchingApplications,
 } from "ee/selectors/selectedWorkspaceSelectors";
 import {
-  getTenantPermissions,
+  getOrganizationPermissions,
   shouldShowLicenseBanner,
-} from "ee/selectors/tenantSelectors";
+} from "ee/selectors/organizationSelectors";
 import { getWorkflowsList } from "ee/selectors/workflowSelectors";
 import {
   getFetchedWorkspaces,
@@ -282,12 +281,9 @@ const TitleTag = styled(Tag)`
   max-width: fit-content;
 `;
 
-// A static component that is a tag signifying Anvil applications
-// This will be passed down to the ApplicationCardsList component
-// in the titleTag prop.
-const AnvilTitleTag = (
+const PreviewTag = (
   <TitleTag isClosable={false} onClose={() => {}}>
-    Anvil α
+    Preview
   </TitleTag>
 );
 
@@ -301,12 +297,12 @@ export function LeftPaneSection(props: {
 }) {
   const dispatch = useDispatch();
   const isFeatureEnabled = useFeatureFlag(FEATURE_FLAG.license_gac_enabled);
-  const tenantPermissions = useSelector(getTenantPermissions);
+  const organizationPermissions = useSelector(getOrganizationPermissions);
   const fetchedWorkspaces = useSelector(getFetchedWorkspaces);
 
   const canCreateWorkspace = getHasCreateWorkspacePermission(
     isFeatureEnabled,
-    tenantPermissions,
+    organizationPermissions,
   );
 
   const createNewWorkspace = async () => {
@@ -558,6 +554,7 @@ export function ApplicationsSection(props: any) {
   // This checks if the Anvil feature flag is enabled and shows different sections in the workspace
   // for Anvil and Classic applications
   const isAnvilEnabled = useSelector(getIsAnvilLayoutEnabled);
+  const isAiAgentFlowEnabled = useSelector(getIsAiAgentFlowEnabled);
   const currentUser = useSelector(getCurrentUser);
   const isMobile = useIsMobileDevice();
   const urlParams = new URLSearchParams(location.search);
@@ -771,7 +768,7 @@ export function ApplicationsSection(props: any) {
       ) {
         createNewApplication(
           getNextEntityName(
-            isAnvilEnabled ? "AI app " : "Untitled application ",
+            "Untitled application ",
             // TODO: Fix this the next time the file is edited
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             applications.map((el: any) => el.name),
@@ -902,14 +899,11 @@ export function ApplicationsSection(props: any) {
             <ResourceListLoader isMobile={isMobile} resources={applications} />
           ) : (
             <>
-              {isAnvilEnabled && ( // Anvil Applications list
+              {!isAiAgentFlowEnabled && (
                 <ApplicationCardList
-                  applications={anvilApplications}
+                  applications={nonAnvilApplications}
                   canInviteToWorkspace={canInviteToWorkspace}
                   deleteApplication={deleteApplication}
-                  emptyStateMessage={createMessage(
-                    NEW_APPLICATION_CARD_LIST_ZERO_STATE,
-                  )}
                   enableImportExport={enableImportExport}
                   hasCreateNewApplicationPermission={
                     hasCreateNewApplicationPermission
@@ -917,40 +911,35 @@ export function ApplicationsSection(props: any) {
                   hasManageWorkspacePermissions={hasManageWorkspacePermissions}
                   isMobile={isMobile}
                   onClickAddNewButton={onClickAddNewAppButton}
-                  title={createMessage(ANVIL_APPLICATIONS)}
-                  titleTag={AnvilTitleTag}
+                  title={createMessage(APPLICATIONS)}
                   updateApplicationDispatch={updateApplicationDispatch}
                   workspaceId={activeWorkspace.id}
                 />
               )}
-              <ApplicationCardList
-                applications={nonAnvilApplications}
-                canInviteToWorkspace={canInviteToWorkspace}
-                deleteApplication={deleteApplication}
-                emptyStateMessage={
-                  // We let the original message includded in the ApplicationCardList component
-                  // show if Anvil is not enabled. If Anvil is enabled, we need to pass the message
-                  // to make them appropriate to the context.
-                  isAnvilEnabled
-                    ? createMessage(CLASSIC_APPLICATION_CARD_LIST_ZERO_STATE)
-                    : undefined
-                }
-                enableImportExport={enableImportExport}
-                hasCreateNewApplicationPermission={
-                  hasCreateNewApplicationPermission
-                }
-                hasManageWorkspacePermissions={hasManageWorkspacePermissions}
-                isMobile={isMobile}
-                onClickAddNewButton={onClickAddNewAppButton}
-                title={
-                  // The title is different based on whether Anvil is enabled or not
-                  createMessage(
-                    isAnvilEnabled ? FIXED_APPLICATIONS : APPLICATIONS,
-                  )
-                }
-                updateApplicationDispatch={updateApplicationDispatch}
-                workspaceId={activeWorkspace.id}
-              />
+              {((isAnvilEnabled && anvilApplications.length > 0) ||
+                isAiAgentFlowEnabled) && (
+                <ApplicationCardList
+                  applications={anvilApplications}
+                  canInviteToWorkspace={canInviteToWorkspace}
+                  deleteApplication={deleteApplication}
+                  emptyStateMessage={
+                    isAiAgentFlowEnabled
+                      ? createMessage(AI_APPLICATION_CARD_LIST_ZERO_STATE)
+                      : undefined
+                  }
+                  enableImportExport={enableImportExport}
+                  hasCreateNewApplicationPermission={
+                    hasCreateNewApplicationPermission
+                  }
+                  hasManageWorkspacePermissions={hasManageWorkspacePermissions}
+                  isMobile={isMobile}
+                  onClickAddNewButton={onClickAddNewAppButton}
+                  title={createMessage(AI_AGENTS_APPLICATIONS)}
+                  titleTag={PreviewTag}
+                  updateApplicationDispatch={updateApplicationDispatch}
+                  workspaceId={activeWorkspace.id}
+                />
+              )}
               <PackageCardList
                 isMobile={isMobile}
                 packages={packages}

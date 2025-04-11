@@ -12,8 +12,8 @@ import styled from "styled-components";
 const SettingsButtonWrapper = styled.div`
   position: fixed;
   bottom: 0;
-  left: 0;
-  width: 100%;
+  right: 0;
+  width: ${(props) => `calc(100% - ${props.theme.sidebarWidth})`};
   height: ${(props) => props.theme.settings.footerHeight}px;
   padding: ${(props) => props.theme.spaces[11]}px 20px 24px
     ${(props) =>
@@ -31,25 +31,25 @@ const SettingsButtonWrapper = styled.div`
 `;
 
 interface SaveAdminSettingsProps {
-  isOnlyTenantConfig?: boolean;
+  isOnlyOrganizationConfig?: boolean;
   isSaving?: boolean;
   needsRefresh?: boolean;
   onSave?: () => void;
   onClear?: () => void;
   settings: Record<string, string>;
   valid: boolean;
-  updatedTenantSettings?: string[];
+  updatedOrganizationSettings?: string[];
 }
 
 const saveAdminSettings = (props: SaveAdminSettingsProps) => {
   const {
-    isOnlyTenantConfig = false,
+    isOnlyOrganizationConfig = false,
     isSaving,
     needsRefresh = false,
     onClear,
     onSave,
     settings,
-    updatedTenantSettings,
+    updatedOrganizationSettings,
     valid,
   } = props;
 
@@ -58,9 +58,9 @@ const saveAdminSettings = (props: SaveAdminSettingsProps) => {
   if (needsRefresh) {
     saveButtonText = SAVE_AND_REFRESH_BUTTON;
   } else if (
-    isOnlyTenantConfig ||
-    (updatedTenantSettings?.length === Object.keys(settings).length &&
-      updatedTenantSettings?.length !== 0)
+    isOnlyOrganizationConfig ||
+    (updatedOrganizationSettings?.length === Object.keys(settings).length &&
+      updatedOrganizationSettings?.length !== 0)
   ) {
     saveButtonText = SAVE_BUTTON;
   }

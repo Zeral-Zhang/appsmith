@@ -86,6 +86,9 @@ export const SIGNUP_PAGE_SUBMIT_BUTTON_TEXT = () => `Sign up`;
 export const ALREADY_HAVE_AN_ACCOUNT = () => `Already have an account?`;
 export const LOOKING_TO_SELF_HOST = () => "Looking to self-host Appsmith?";
 export const VISIT_OUR_DOCS = () => "Visit our docs";
+export const ALREADY_USING_APPSMITH = () => `Already using Appsmith?`;
+export const SIGN_IN_TO_AN_EXISTING_ORGANISATION = () =>
+  `Sign in to an existing organisation`;
 
 export const SIGNUP_PAGE_SUCCESS = () =>
   `Awesome! You have successfully registered.`;
@@ -210,7 +213,11 @@ export const PARTNER_PROGRAM_CALLOUT_LINK = () =>
 export const NEW_APPLICATION = () => `New application`;
 export const APPLICATIONS = () => `Applications`;
 export const FIXED_APPLICATIONS = () => `Classic Applications`;
-export const ANVIL_APPLICATIONS = () => `New Applications`;
+export const AI_AGENTS_APPLICATIONS = () => `AI Agents`;
+export const AI_APPLICATION_CARD_LIST_ZERO_STATE = () =>
+  `There are no AI Agents in this workspace.`;
+export const AI_AGENT_AUTH_SUBTITLE = () =>
+  `Sign up with any Google account.\n Support for email will be available soon.`;
 
 export const USER_PROFILE_PICTURE_UPLOAD_FAILED = () =>
   "Unable to upload display picture.";
@@ -272,8 +279,6 @@ export const APPLICATION_CARD_LIST_ZERO_STATE = () =>
   `There are no applications in this workspace.`;
 export const NEW_APPLICATION_CARD_LIST_ZERO_STATE = () =>
   `There are no new applications in this workspace.`;
-export const CLASSIC_APPLICATION_CARD_LIST_ZERO_STATE = () =>
-  `There are no classic applications in this workspace.`;
 export const TRY_GUIDED_TOUR = () => `Try guided tour`;
 export const JOIN_OUR_DISCORD = () => `Join our discord`;
 export const WHATS_NEW = () => `What's new?`;
@@ -390,9 +395,9 @@ export const ACTION_RUN_BUTTON_MESSAGE_SECOND_HALF = () =>
   "after adding your query";
 export const CREATE_NEW_DATASOURCE = () => "Create datasource";
 export const CREATE_NEW_DATASOURCE_DATABASE_HEADER = () => "Databases";
-export const CREATE_NEW_DATASOURCE_MOST_POPULAR_HEADER = () => "Most popular";
+export const CREATE_NEW_DATASOURCE_MOST_POPULAR_HEADER = () => "Most Popular";
 export const CREATE_NEW_DATASOURCE_REST_API = () => "REST API";
-export const SAMPLE_DATASOURCES = () => "Sample datasources";
+export const SAMPLE_DATASOURCES = () => "Sample Datasources";
 export const SAMPLE_DATASOURCE_SUBHEADING = () =>
   "Use sample datasources if you don’t have a datasource for testing";
 export const EDIT_DS_CONFIG = () => "Edit datasource configuration";
@@ -401,8 +406,8 @@ export const CREATE_NEW_DATASOURCE_AUTHENTICATED_REST_API = () =>
   "Authenticated API";
 export const CREATE_NEW_DATASOURCE_GRAPHQL_API = () => "GraphQL API";
 export const CREATE_NEW_API_SECTION_HEADER = () => "APIs";
-export const CREATE_NEW_SAAS_SECTION_HEADER = () => "SaaS integrations";
-export const CREATE_NEW_AI_SECTION_HEADER = () => "AI integrations";
+export const CREATE_NEW_SAAS_SECTION_HEADER = () => "SaaS Integrations";
+export const CREATE_NEW_AI_SECTION_HEADER = () => "AI Integrations";
 export const CONNECT_A_DATASOURCE_HEADING = () => "Connect a datasource";
 export const CONNECT_A_DATASOURCE_SUBHEADING = () =>
   "Select a sample datasource or connect your own";
@@ -624,6 +629,7 @@ export const GET_GEO_LOCATION = () => `Get geolocation`;
 export const WATCH_GEO_LOCATION = () => `Watch geolocation`;
 export const STOP_WATCH_GEO_LOCATION = () => `Stop watching geolocation`;
 export const POST_MESSAGE = () => `Post message`;
+export const LOGOUT_USER = () => `Logout user`;
 
 //js actions
 export const JS_ACTION_COPY_SUCCESS = (actionName: string, pageName: string) =>
@@ -649,6 +655,7 @@ export const EXPORT_DEFAULT_BEGINNING = () =>
   `Start object with export default`;
 export const ACTION_EXECUTION_FAILED = (actionName: string) =>
   `The action "${actionName}" has failed.`;
+export const CANNOT_GENERATE_SCHEMA = () => "Can't generate schema";
 export const JS_EXECUTION_TRIGGERED = () => "Function triggered";
 export const JS_EXECUTION_SUCCESS = () => "Function executed";
 export const JS_EXECUTION_FAILURE = () => "Function execution failed";
@@ -683,17 +690,15 @@ export const ERROR_IMPORTING_APPLICATION_TO_WORKSPACE = () =>
 export const IMPORT_APPLICATION_MODAL_TITLE = () => "Import application";
 export const IMPORT_APPLICATION_MODAL_LABEL = () =>
   "Where would you like to import your application from?";
-export const IMPORT_FROM_GIT_DISABLED_IN_ANVIL = () =>
-  "Importing from Git repositories is not yet supported in Anvil α";
 export const IMPORT_APP_FROM_FILE_TITLE = () => "Import from file";
 export const UPLOADING_JSON = () => "Uploading JSON file";
 export const UPLOADING_APPLICATION = () => "Uploading application";
-export const IMPORT_APP_FROM_GIT_TITLE = () =>
-  "Import from Git repository (Beta)";
+export const IMPORT_APP_FROM_GIT_TITLE = (isBeta: boolean = true) =>
+  `Import from Git repository ${isBeta ? "(Beta)" : ""}`;
 export const IMPORT_APP_FROM_FILE_MESSAGE = () =>
   "Drag and drop your file or upload from your computer";
 export const IMPORT_APP_FROM_GIT_MESSAGE = () =>
-  "Import an application from its Git repository using its SSH URL";
+  "Import from a Git repository using its SSH URL";
 export const IMPORT_FROM_GIT_REPOSITORY = () => "Import from Git repository";
 export const RECONNECT_MISSING_DATASOURCE_CREDENTIALS = () =>
   "Reconnect missing datasource credentials";
@@ -923,7 +928,6 @@ export const IS_MERGING = () => "Merging changes...";
 
 export const MERGE_CHANGES = () => "Merge changes";
 export const SELECT_BRANCH_TO_MERGE = () => "Select branch to merge";
-export const CONNECT_GIT = () => "Connect Git";
 export const CONNECT_GIT_BETA = () => "Connect Git (Beta)";
 export const RETRY = () => "Retry";
 export const CREATE_NEW_BRANCH = () => "Create new branch";
@@ -1151,8 +1155,8 @@ export const NO_COPIED_SSH_KEY = () => "Could not copy SSH key";
 // Git Branch Protection
 export const UPDATE = () => "Update";
 export const DEFAULT_BRANCH = () => "Default branch";
-export const DEFAULT_BRANCH_DESC = () =>
-  "This is the base branch of the app. Users launching the app from the dashboard will see the deployed version from this branch.";
+export const DEFAULT_BRANCH_DESC = (artifactNoun: string) =>
+  `This is the base branch of the ${artifactNoun}. Users launching the ${artifactNoun} from the dashboard will see the deployed version from this branch.`;
 export const BRANCH_PROTECTION = () => "Branch protection";
 export const BRANCH_PROTECTION_DESC = () =>
   "Protected branches enable you to enforce Git workflows. Changes to the app are not allowed in the protected branches.";
@@ -1179,17 +1183,22 @@ export const BRANCH_PROTECTION_PROTECTED = () => "Protected";
 export const GIT_CONNECT_SUCCESS_TITLE = () => "Successfully connected to Git";
 export const GIT_CONNECT_SUCCESS_MESSAGE = () =>
   "Now you can start collaborating with your team members by committing, merging and deploying your app";
-export const GIT_CONNECT_SUCCESS_ACTION_CONTINUE = () =>
-  "Continue to edit application";
+export const GIT_CONNECT_SUCCESS_ACTION_CONTINUE = (
+  artifactType: string = "applications",
+) => `Continue to edit ${artifactType}`;
 export const GIT_CONNECT_SUCCESS_ACTION_SETTINGS = () => "Protect your branch";
 export const GIT_CONNECT_SUCCESS_PROTECTION_MSG = () =>
   "We recommend protecting your default branch to have a seamless collaboration.";
+export const GIT_CONNECT_SUCCESS_GENERIC_MESSAGE = (artifactType: string) =>
+  `You're all set! Your ${artifactType} is now connected to Git.`;
 export const GIT_CONNECT_SUCCESS_REPO_NAME = () => "Repository name";
 export const GIT_CONNECT_SUCCESS_DEFAULT_BRANCH = () => "Default branch";
 export const GIT_CONNECT_SUCCESS_DEFAULT_BRANCH_TOOLTIP = () =>
   "This is the base branch of the app. Users launching the app from the dashboard will see the deployed version from this branch.";
 export const GIT_CONNECT_SUCCESS_PROTECTION_DOC_CTA = () =>
   "Learn more about branch protection";
+export const GIT_CONNECT_SUCCESS_GENERIC_DOC_CTA = () =>
+  "Learn more about how to work with Git.";
 // Git Connection Success end
 
 export const GENERAL = () => "General";
@@ -1484,16 +1493,16 @@ export const DISCONNECT_AUTH_ERROR = () =>
   "Cannot disconnect the only connected authentication method.";
 export const MANDATORY_FIELDS_ERROR = () => "Mandatory fields cannot be empty";
 export const FORM_LOGIN_DESC = () =>
-  "Enable your workspace to sign in with Appsmith Form.";
+  "Enable your organization to sign in with Appsmith Form.";
 export const GOOGLE_AUTH_DESC = () =>
-  "Enable your workspace to sign in with Google (OAuth 2.0) single sign-on (SSO).";
+  "Enable your organization to sign in with Google (OAuth 2.0) single sign-on (SSO).";
 export const GITHUB_AUTH_DESC = () =>
-  "Enable your workspace to sign in with GitHub (OAuth 2.0) single sign-on (SSO).";
+  "Enable your organization to sign in with GitHub (OAuth 2.0) single sign-on (SSO).";
 export const SAML_AUTH_DESC = () =>
-  "Enable your workspace to sign in with your preferred SAML2 compliant provider.";
+  "Enable your organization to sign in with your preferred SAML2 compliant provider.";
 export const OIDC_AUTH_DESC = () =>
-  "Enable your workspace to sign in with your preferred OIDC compliant provider.";
-export const SAVE_BUTTON = () => "Save";
+  "Enable your organization to sign in with your preferred OIDC compliant provider.";
+export const SAVE_BUTTON = () => "Save Changes";
 export const SAVE_AND_RESTART_BUTTON = () => "Save & Restart";
 export const SAVE_AND_REFRESH_BUTTON = () => "Save & Refresh";
 export const RESET_BUTTON = () => "Reset";
@@ -1502,8 +1511,11 @@ export const ENTERPRISE_TAG = () => "Enterprise";
 
 // Upgrade pages begin
 export const AVAILABLE_ON_BUSINESS = () => "Available on a business plan only";
-export const EXCLUSIVE_TO_BUSINESS = (featureName: string) =>
-  `The ${featureName} feature is exclusive to workspaces on the business plan`;
+export const EXCLUSIVE_TO_BUSINESS = (
+  featureName: string,
+  planName: "business" | "enterprise" = "business",
+) =>
+  `The ${featureName} feature is exclusive to workspaces on the ${planName} plan`;
 export const AVAILABLE_ON_ENTERPRISE = () => "Available on Appsmith Enterprise";
 // Upgrade pages end
 
@@ -1548,7 +1560,7 @@ export const RESTRICT_PUBLIC_EXPOSURE = () =>
 export const RESTRICT_PUBLIC_EXPOSURE_DETAIL1 = () =>
   "Proactively disallow groups of non-admin or non-super-admin users from publicly sharing your app or exporting app data out of your environment, domain, and security perimeters.";
 export const ACCESS_CONTROL_UPGRADE_PAGE_FOOTER = () =>
-  "Unlock granular access controls along with audit logs and SSO for enhanced security and reliability with an upgrade to our Business plan.";
+  "Unlock granular access controls along with audit logs and SSO for enhanced security and reliability with an upgrade to our business plan.";
 // Access control upgrade page end
 
 // Provisioning upgrade page begin
@@ -1575,6 +1587,7 @@ export const WELCOME_FORM_NON_SUPER_USER_USE_CASE = () =>
   "What would you like to use Appsmith for?";
 export const WELCOME_FORM_NON_SUPER_USER_PROFICIENCY_LEVEL = () =>
   "What is your general development proficiency?";
+export const WELCOME_FORM_FULL_NAME = () => "What’s your full name?";
 
 export const WELCOME_FORM_PROFICIENCY_ERROR_MESSAGE = () =>
   "Please select a proficiency level";
@@ -1683,6 +1696,8 @@ export const ADMIN_BRANDING_FAVICON_FORMAT_ERROR = () =>
   `Uploaded file must be in .ICO, .PNG, and .JPG formats`;
 export const ADMIN_BRANDING_FAVICON_REQUIREMENT = () =>
   `.ICO, .PNG, or .JPG only • Max 32X32`;
+export const PROFILE_DISPLAY_PICTURE_REQUIREMENT = () =>
+  `.ICO, .PNG, or .JPG only • Max 32X32`;
 export const ADMIN_BRANDING_COLOR_TOOLTIP_PRIMARY = () =>
   `Used on buttons, links, and other interactive elements.`;
 export const ADMIN_BRANDING_COLOR_TOOLTIP_BACKGROUND = () =>
@@ -1775,6 +1790,7 @@ export const CONTEXT_SETTINGS = () => "Settings";
 export const CONTEXT_PARTIAL_EXPORT = () => "Export";
 export const CONTEXT_PARTIAL_IMPORT = () => "Import";
 export const CONTEXT_SET_AS_HOME_PAGE = () => "Set as home page";
+export const CONTEXT_INSPECT_STATE = () => "Inspect state";
 export const PAGE = () => "Page";
 export const PAGES = () => "Pages";
 
@@ -1983,6 +1999,10 @@ export const IN_APP_EMBED_SETTING = {
     "Make your app public to embed your Appsmith app into legacy applications",
   secondaryHeading: () =>
     "Embedding in public mode is supported in the free plan. To make your app public, please contact your administrator.",
+  chromeExtensionBannerTitle: () => "Get the Chrome extension",
+  chromeExtensionBannerDescription: () =>
+    "Bring powerful AI assistance to the tools you and your teams use.",
+  chromeExtensionBannerButton: () => "Get the extension",
 };
 
 export const APP_NAVIGATION_SETTING = {
@@ -2362,10 +2382,12 @@ export const EDITOR_PANE_TEXTS = {
   query_create_tab_title: () => "Create new query from",
   widgets_create_tab_title: () => "Drag & drop UI elements",
   js_create_tab_title: () => "Create JS object from",
-  js_create_modules: () => "JS modules (Beta)",
+  js_create_modules: (isBeta: boolean) =>
+    `JS modules ${isBeta ? "(Beta)" : ""}`,
   queries_create_from_existing: () => "Datasources",
   queries_create_new: () => "Quick actions",
-  queries_create_modules: () => "Query modules (Beta)",
+  queries_create_modules: (isBeta: boolean) =>
+    `Query modules ${isBeta ? "(Beta)" : ""}`,
   loading_building_blocks: () => "Loading building blocks",
   empty_search_result: (type: string) => `No ${type} match your search`,
   search_objects: {
@@ -2626,3 +2648,42 @@ export const PREMIUM_DATASOURCES = {
 
 export const DATASOURCE_SECURE_TEXT = () =>
   `When connecting datasources, your passwords are AES-256 encrypted and we never store any of your data.`;
+
+export const TABLE_LOADING_RECORDS = () => "loading records";
+
+export const TABLE_LOAD_MORE = () => "Load More";
+
+export const UPCOMING_SAAS_INTEGRATIONS = () => "Upcoming SaaS Integrations";
+
+export const NO_SEARCH_COMMAND_FOUND_EXTERNAL_SAAS = () =>
+  "No actions match your search";
+
+export const ADD_CUSTOM_ACTION = () => "Add custom action";
+
+export const CONFIG_PROPERTY_COMMAND = () => "command";
+
+export const CUSTOM_ACTION_LABEL = () => "Custom Action";
+
+export const AUTH_LOGIN_TOO_MANY_ATTEMPTS = () =>
+  "Too many login attempts. Please try again after some time.";
+export const AUTH_INVALID_CREDENTIALS = () =>
+  "Invalid credentials provided. Did you input the credentials correctly?";
+export const AUTH_UNAUTHORIZED = () => "Unauthorized access";
+export const AUTH_NOT_LOGGED_IN = () =>
+  "You are not logged in. Please sign in with the registered email ID or sign up";
+export const AUTH_RESET_PASSWORD_REQUEST_INVALID = () =>
+  'Cannot find an outstanding reset password request for this email. Please initiate a request via "forgot password" button to reset your password';
+export const AUTH_LOGIN_METHOD_NOT_SUPPORTED = () =>
+  "Login with this method is not supported.";
+export const AUTH_ACCOUNT_LOCKED = () =>
+  "Account temporarily locked due to multiple failed attempts. Please try again later.";
+export const AUTH_SESSION_INVALID = () =>
+  "User session is invalid. Please log out and log in again.";
+
+// Signup & Email verification
+export const EMAIL_VERIFICATION_NOT_ENABLED = () =>
+  "Email Verification not enabled";
+export const GOOGLE_RECAPTCHA_FAILED = () =>
+  "Google reCAPTCHA verification failed";
+export const PASSWORD_INSUFFICIENT_STRENGTH = () =>
+  "Insufficient password strength";

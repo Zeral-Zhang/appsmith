@@ -39,7 +39,7 @@ import {
 } from "layoutSystems/common/utils/constants";
 import { renderAppsmithCanvas } from "layoutSystems/CanvasFactory";
 import { generateDefaultLayoutPreset } from "layoutSystems/anvil/layoutComponents/presets/DefaultLayoutPreset";
-import type { CanvasWidgetsReduxState } from "reducers/entityReducers/canvasWidgetsReducer";
+import type { CanvasWidgetsReduxState } from "ee/reducers/entityReducers/canvasWidgetsReducer";
 import { LayoutSystemTypes } from "layoutSystems/types";
 import type { LayoutProps } from "layoutSystems/anvil/utils/anvilTypes";
 import { getWidgetBluePrintUpdates } from "utils/WidgetBlueprintUtils";
@@ -416,6 +416,7 @@ export interface ContainerWidgetProps<T extends WidgetProps>
   shouldScrollContents?: boolean;
   noPad?: boolean;
   positioning?: Positioning;
+  forceFullOpacity?: boolean; // used to force full opacity for ui module instance meta widgets
 }
 
 export default ContainerWidget;

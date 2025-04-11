@@ -1,5 +1,6 @@
 package com.external.plugins;
 
+import com.appsmith.external.configurations.connectionpool.ConnectionPoolConfig;
 import com.appsmith.external.models.Connection;
 import com.appsmith.external.models.DBAuth;
 import com.appsmith.external.models.DatasourceConfiguration;
@@ -9,6 +10,7 @@ import com.appsmith.external.models.SSHConnection;
 import com.appsmith.external.models.SSHPrivateKey;
 import com.appsmith.external.models.SSLDetails;
 import com.appsmith.external.models.UploadedFile;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -25,7 +27,15 @@ import static com.appsmith.external.models.Connection.Mode.READ_WRITE;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class MySQLDatasourceValidationTest {
-    static MySqlPlugin.MySqlPluginExecutor pluginExecutor = new MySqlPlugin.MySqlPluginExecutor();
+    private static class MockConnectionPoolConfig implements ConnectionPoolConfig {
+        @Override
+        public Mono<Integer> getMaxConnectionPoolSize() {
+            return Mono.just(5);
+        }
+    }
+
+    static MySqlPlugin.MySqlPluginExecutor pluginExecutor =
+            new MySqlPlugin.MySqlPluginExecutor(new MockConnectionPoolConfig(), ObservationRegistry.NOOP);
 
     private DatasourceConfiguration getDatasourceConfigurationWithStandardConnectionMethod() {
         DatasourceConfiguration datasourceConfiguration = new DatasourceConfiguration();

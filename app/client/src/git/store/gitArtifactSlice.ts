@@ -5,6 +5,7 @@ import {
   connectErrorAction,
   connectInitAction,
   connectSuccessAction,
+  resetConnectAction,
 } from "./actions/connectActions";
 import {
   fetchMetadataErrorAction,
@@ -136,6 +137,20 @@ import {
   generateSSHKeySuccessAction,
   resetGenerateSSHKeyAction,
 } from "./actions/generateSSHKeyActions";
+import {
+  resetCurrentBranchAction,
+  updateCurrentBranchAction,
+} from "./actions/currentBranchActions";
+import {
+  pretagErrorAction,
+  pretagInitAction,
+  pretagSuccessAction,
+} from "./actions/pretagActions";
+import {
+  createReleaseTagErrorAction,
+  createReleaseTagInitAction,
+  createReleaseTagSuccessAction,
+} from "./actions/createReleaseTagActions";
 
 const initialState: GitArtifactRootReduxState = {};
 
@@ -157,6 +172,7 @@ export const gitArtifactSlice = createSlice({
     connectInit: connectInitAction,
     connectSuccess: connectSuccessAction,
     connectError: connectErrorAction,
+    resetConnect: resetConnectAction,
     fetchSSHKeyInit: fetchSSHKeyInitAction,
     fetchSSHKeySuccess: fetchSSHKeySuccessAction,
     fetchSSHKeyError: fetchSSHKeyErrorAction,
@@ -214,6 +230,8 @@ export const gitArtifactSlice = createSlice({
     checkoutBranchSuccess: checkoutBranchSuccessAction,
     checkoutBranchError: checkoutBranchErrorAction,
     toggleBranchPopup: toggleBranchPopupAction,
+    updateCurrentBranch: updateCurrentBranchAction,
+    resetCurrentBranch: resetCurrentBranchAction,
 
     // settings
     toggleSettingsModal: toggleSettingsModalAction,
@@ -243,6 +261,14 @@ export const gitArtifactSlice = createSlice({
     pollAutocommitProgressStart: pollAutocommitProgressStartAction,
     pollAutocommitProgressStop: pollAutocommitProgressStopAction,
     toggleAutocommitDisableModal: toggleAutocommitDisableModalAction,
+
+    // release tags
+    pretagInit: pretagInitAction,
+    pretagSuccess: pretagSuccessAction,
+    pretagError: pretagErrorAction,
+    createReleaseTagInit: createReleaseTagInitAction,
+    createReleaseTagSuccess: createReleaseTagSuccessAction,
+    createReleaseTagError: createReleaseTagErrorAction,
 
     ...gitArtifactCaseReducers,
   },

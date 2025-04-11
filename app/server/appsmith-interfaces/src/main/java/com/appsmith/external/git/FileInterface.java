@@ -32,10 +32,14 @@ public interface FileInterface {
      *       --page2
      */
     Mono<Path> saveApplicationToGitRepo(
-            Path baseRepoSuffix, ArtifactGitReference artifactGitReference, String branchName)
+            Path baseRepoSuffix,
+            ArtifactGitReference artifactGitReference,
+            String branchName,
+            Boolean isRtsResetEnabled)
             throws IOException, GitAPIException;
 
-    Mono<Path> saveArtifactToGitRepo(Path baseRepoSuffix, GitResourceMap gitResourceMap, String branchName)
+    Mono<Path> saveArtifactToGitRepo(
+            Path baseRepoSuffix, GitResourceMap gitResourceMap, String branchName, boolean keepWorkingDirChanges)
             throws GitAPIException, IOException;
 
     /**
@@ -70,6 +74,8 @@ public interface FileInterface {
             String branchName,
             Path repoSuffixPath,
             Boolean isResetToLastCommitRequired);
+
+    Mono<Object> reconstructMetadataFromGitRepository(Path repoSuffix);
 
     Mono<Object> reconstructPageFromGitRepo(
             String pageName, String branchName, Path repoSuffixPath, Boolean checkoutRequired);

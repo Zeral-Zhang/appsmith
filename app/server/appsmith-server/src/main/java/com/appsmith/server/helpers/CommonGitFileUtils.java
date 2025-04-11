@@ -2,6 +2,7 @@ package com.appsmith.server.helpers;
 
 import com.appsmith.external.git.FileInterface;
 import com.appsmith.external.git.operations.FileOperations;
+import com.appsmith.git.configurations.GitServiceConfig;
 import com.appsmith.git.files.FileUtilsImpl;
 import com.appsmith.server.actioncollections.base.ActionCollectionService;
 import com.appsmith.server.dtos.ApplicationJson;
@@ -9,6 +10,7 @@ import com.appsmith.server.helpers.ce.CommonGitFileUtilsCE;
 import com.appsmith.server.migrations.JsonSchemaVersions;
 import com.appsmith.server.newactions.base.NewActionService;
 import com.appsmith.server.services.AnalyticsService;
+import com.appsmith.server.services.FeatureFlagService;
 import com.appsmith.server.services.SessionUserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ public class CommonGitFileUtils extends CommonGitFileUtilsCE {
 
     public CommonGitFileUtils(
             ArtifactGitFileUtils<ApplicationJson> applicationGitFileUtils,
+            GitServiceConfig gitServiceConfig,
             FileInterface fileUtils,
             FileOperations fileOperations,
             AnalyticsService analyticsService,
@@ -29,9 +32,11 @@ public class CommonGitFileUtils extends CommonGitFileUtilsCE {
             NewActionService newActionService,
             ActionCollectionService actionCollectionService,
             JsonSchemaVersions jsonSchemaVersions,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            FeatureFlagService featureFlagService) {
         super(
                 applicationGitFileUtils,
+                gitServiceConfig,
                 fileUtils,
                 fileOperations,
                 analyticsService,
@@ -39,6 +44,7 @@ public class CommonGitFileUtils extends CommonGitFileUtilsCE {
                 newActionService,
                 actionCollectionService,
                 jsonSchemaVersions,
-                objectMapper);
+                objectMapper,
+                featureFlagService);
     }
 }

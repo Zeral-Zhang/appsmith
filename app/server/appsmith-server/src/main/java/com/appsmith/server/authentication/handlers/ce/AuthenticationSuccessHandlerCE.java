@@ -8,25 +8,22 @@ import com.appsmith.server.constants.Security;
 import com.appsmith.server.domains.Application;
 import com.appsmith.server.domains.LoginSource;
 import com.appsmith.server.domains.User;
-import com.appsmith.server.domains.Workspace;
 import com.appsmith.server.dtos.ResendEmailVerificationDTO;
 import com.appsmith.server.helpers.RedirectHelper;
+import com.appsmith.server.helpers.UserSignupHelper;
 import com.appsmith.server.helpers.WorkspaceServiceHelper;
+import com.appsmith.server.instanceconfigs.helpers.InstanceVariablesHelper;
 import com.appsmith.server.ratelimiting.RateLimitService;
 import com.appsmith.server.repositories.UserRepository;
-import com.appsmith.server.repositories.WorkspaceRepository;
 import com.appsmith.server.services.AnalyticsService;
 import com.appsmith.server.services.ApplicationPageService;
+import com.appsmith.server.services.OrganizationService;
 import com.appsmith.server.services.SessionUserService;
-import com.appsmith.server.services.TenantService;
 import com.appsmith.server.services.UserDataService;
 import com.appsmith.server.services.UserService;
-import com.appsmith.server.services.WorkspaceService;
-import com.appsmith.server.solutions.WorkspacePermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.web.server.DefaultServerRedirectStrategy;
@@ -60,27 +57,27 @@ public class AuthenticationSuccessHandlerCE implements ServerAuthenticationSucce
     private final AnalyticsService analyticsService;
     private final UserDataService userDataService;
     private final UserRepository userRepository;
-    private final WorkspaceRepository workspaceRepository;
-    private final WorkspaceService workspaceService;
     private final ApplicationPageService applicationPageService;
-    private final WorkspacePermission workspacePermission;
     private final RateLimitService rateLimitService;
-    private final TenantService tenantService;
+    private final OrganizationService organizationService;
     private final UserService userService;
     private final WorkspaceServiceHelper workspaceServiceHelper;
+    private final InstanceVariablesHelper instanceVariablesHelper;
+    private final UserSignupHelper userSignupHelper;
 
     private Mono<Boolean> isVerificationRequired(String userEmail, String method) {
-        Mono<Boolean> emailVerificationEnabledMono = tenantService
-                .getTenantConfiguration()
-                .map(tenant -> tenant.getTenantConfiguration().isEmailVerificationEnabled())
-                .cache();
+        Mono<Boolean> emailVerificationEnabledMono =
+                instanceVariablesHelper.isEmailVerificationEnabled().cache();
 
-        Mono<User> userMono = userRepository.findByEmail(userEmail).cache();
+        Mono<User> userMono = organizationService
+                .getCurrentUserOrganizationId()
+                .flatMap(orgId -> userRepository.findByEmailAndOrganizationId(userEmail, orgId))
+                .cache();
         Mono<Boolean> verificationRequiredMono = null;
 
         if ("signup".equals(method)) {
             verificationRequiredMono = emailVerificationEnabledMono.flatMap(emailVerificationEnabled -> {
-                // email verification is not enabled at the tenant, so verification not required
+                // email verification is not enabled at the org, so verification not required
                 if (!TRUE.equals(emailVerificationEnabled)) {
                     return userMono.flatMap(user -> {
                         user.setEmailVerificationRequired(FALSE);
@@ -101,13 +98,13 @@ public class AuthenticationSuccessHandlerCE implements ServerAuthenticationSucce
                     return Mono.just(FALSE);
                 } else {
                     return emailVerificationEnabledMono.flatMap(emailVerificationEnabled -> {
-                        // email verification not enabled at the tenant
+                        // email verification not enabled
                         if (!TRUE.equals(emailVerificationEnabled)) {
                             user.setEmailVerificationRequired(FALSE);
                             return userRepository.save(user).then(Mono.just(FALSE));
                         } else {
-                            // scenario when at the time of signup, the email verification was disabled at the tenant
-                            // but later on turned on, now when this user logs in, it will not be prompted to verify
+                            // scenario when at the time of signup, the email verification was disabled but later on
+                            // turned on, now when this user logs in, it will not be prompted to verify
                             // as the configuration at time of signup is considered for any user.
                             // for old users, the login works as expected, without the need to verify
                             if (!TRUE.equals(user.getEmailVerificationRequired())) {
@@ -169,16 +166,20 @@ public class AuthenticationSuccessHandlerCE implements ServerAuthenticationSucce
     private Mono<Void> postVerificationRequiredHandler(
             WebFilterExchange webFilterExchange, User user, Application defaultApplication) {
         return webFilterExchange.getExchange().getSession().flatMap(webSession -> {
+            // First remove the security context from the session attributes
             webSession.getAttributes().remove(DEFAULT_SPRING_SECURITY_CONTEXT_ATTR_NAME);
-            return redirectHelper
-                    .getAuthSuccessRedirectUrl(webFilterExchange, defaultApplication, true)
-                    .flatMap(redirectUrl -> extractRedirectUrlAndSendVerificationMail(
-                                    webFilterExchange, user, redirectUrl)
-                            .map(url -> String.format(
-                                    "/user/verificationPending?email=%s",
-                                    URLEncoder.encode(user.getEmail(), StandardCharsets.UTF_8)))
-                            .flatMap(redirectUri -> redirectStrategy.sendRedirect(
-                                    webFilterExchange.getExchange(), URI.create(redirectUri))));
+            // Then invalidate the entire session to remove it from Redis
+            return webSession
+                    .invalidate()
+                    .then(redirectHelper
+                            .getAuthSuccessRedirectUrl(webFilterExchange, defaultApplication, true)
+                            .flatMap(redirectUrl -> extractRedirectUrlAndSendVerificationMail(
+                                            webFilterExchange, user, redirectUrl)
+                                    .map(url -> String.format(
+                                            "/user/verificationPending?email=%s",
+                                            URLEncoder.encode(user.getEmail(), StandardCharsets.UTF_8)))
+                                    .flatMap(redirectUri -> redirectStrategy.sendRedirect(
+                                            webFilterExchange.getExchange(), URI.create(redirectUri)))));
         });
     }
 
@@ -188,7 +189,7 @@ public class AuthenticationSuccessHandlerCE implements ServerAuthenticationSucce
      * then redirects the user to /verificationPending and sends the magic link with the user's redirectUrl
      * in the email.
      */
-    private Mono<Void> formEmailVerificationRedirectionHandler(
+    public Mono<Void> formEmailVerificationRedirectionHandler(
             WebFilterExchange webFilterExchange,
             String defaultWorkspaceId,
             Authentication authentication,
@@ -343,41 +344,10 @@ public class AuthenticationSuccessHandlerCE implements ServerAuthenticationSucce
     }
 
     protected Mono<Application> createDefaultApplication(String defaultWorkspaceId, Authentication authentication) {
-
         // need to create default application
-        Application application = new Application();
-        application.setWorkspaceId(defaultWorkspaceId);
-        application.setName("My first application");
-        Mono<Application> applicationMono = Mono.just(application);
-        if (defaultWorkspaceId == null) {
-
-            applicationMono = workspaceRepository
-                    .findAll(workspacePermission.getEditPermission())
-                    .take(1, true)
-                    .collectList()
-                    .flatMap(workspaces -> {
-                        // Since this is the first application creation, the first workspace would be the only
-                        // workspace user has access to, and would be user's default workspace. Hence, we use this
-                        // workspace to create the application.
-                        if (workspaces.size() == 1) {
-                            application.setWorkspaceId(workspaces.get(0).getId());
-                            return Mono.just(application);
-                        }
-
-                        // In case no workspaces are found for the user, create a new default workspace
-                        String email = ((User) authentication.getPrincipal()).getEmail();
-
-                        return userRepository
-                                .findByEmail(email)
-                                .flatMap(user -> workspaceService.createDefault(new Workspace(), user))
-                                .map(workspace -> {
-                                    application.setWorkspaceId(workspace.getId());
-                                    return application;
-                                });
-                    });
-        }
-
-        return applicationMono.flatMap(applicationPageService::createApplication);
+        return userSignupHelper
+                .createWorkspaceIfNotExistsAndGetId(defaultWorkspaceId, authentication)
+                .flatMap(userSignupHelper::createDefaultApplication);
     }
 
     /**

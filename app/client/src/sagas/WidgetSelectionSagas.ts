@@ -17,7 +17,7 @@ import {
 } from "actions/widgetSelectionActions";
 import { MAIN_CONTAINER_WIDGET_ID } from "constants/WidgetConstants";
 import { APP_MODE } from "entities/App";
-import type { CanvasWidgetsReduxState } from "reducers/entityReducers/canvasWidgetsReducer";
+import type { CanvasWidgetsReduxState } from "ee/reducers/entityReducers/canvasWidgetsReducer";
 import { all, call, put, select, take, takeLatest } from "redux-saga/effects";
 import type { SetSelectionResult } from "sagas/WidgetSelectUtils";
 import {
@@ -54,9 +54,16 @@ import {
 } from "./selectors";
 import { getModalWidgetType } from "selectors/widgetSelectors";
 import { getWidgetSelectorByWidgetId } from "selectors/layoutSystemSelectors";
-import { getAppViewerPageIdFromPath } from "ee/pages/Editor/Explorer/helpers";
+import {
+  isUIPackageEditorPath,
+  isEditorPath,
+} from "ee/pages/Editor/Explorer/helpers";
 import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import { getIsAnvilLayout } from "layoutSystems/anvil/integrations/selectors";
+import type { Saga } from "redux-saga";
+import { getIDETypeByUrl } from "ee/entities/IDE/utils";
+import { IDE_TYPE } from "ee/IDE/Interfaces/IDETypes";
+import { waitForPackageInitialization } from "ee/sagas/moduleInterfaceSaga";
 
 // The following is computed to be used in the entity explorer
 // Every time a widget is selected, we need to expand widget entities
@@ -77,9 +84,9 @@ function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
      * This also safeguards against the case where the selection process is triggered by a non-canvas click where user moves out of editor.
      * */
 
-    const isOnEditorURL = !!getAppViewerPageIdFromPath(
-      window.location.pathname,
-    );
+    const isOnEditorURL =
+      isEditorPath(window.location.pathname) ||
+      isUIPackageEditorPath(window.location.pathname);
 
     if (payload.some(isInvalidSelectionRequest) || !isOnEditorURL) {
       // Throw error
@@ -270,9 +277,17 @@ function* appendSelectedWidgetToUrlSaga(
   }
 }
 
-// TODO: Fix this the next time the file is edited
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function* waitForInitialization(saga: any, action: ReduxAction<unknown>) {
+function* waitForInitialization(saga: Saga, action: ReduxAction<unknown>) {
+  const ideType = getIDETypeByUrl(window.location.pathname);
+
+  if (ideType === IDE_TYPE.UIPackage) {
+    yield call(waitForPackageInitialization, saga, action);
+  } else {
+    yield call(waitForAppInitialization, saga, action);
+  }
+}
+
+function* waitForAppInitialization(saga: Saga, action: ReduxAction<unknown>) {
   const isEditorInitialized: boolean = yield select(getIsEditorInitialized);
   const appMode: APP_MODE = yield select(getAppMode);
   const isViewMode = appMode === APP_MODE.PUBLISHED;

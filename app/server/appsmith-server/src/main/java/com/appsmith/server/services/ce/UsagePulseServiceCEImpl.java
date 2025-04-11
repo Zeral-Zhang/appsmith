@@ -11,8 +11,8 @@ import com.appsmith.server.helpers.ce.bridge.Bridge;
 import com.appsmith.server.helpers.ce.bridge.BridgeUpdate;
 import com.appsmith.server.repositories.UsagePulseRepository;
 import com.appsmith.server.services.ConfigService;
+import com.appsmith.server.services.OrganizationService;
 import com.appsmith.server.services.SessionUserService;
-import com.appsmith.server.services.TenantService;
 import com.appsmith.server.services.UserService;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -33,7 +33,7 @@ public class UsagePulseServiceCEImpl implements UsagePulseServiceCE {
 
     private final UserService userService;
 
-    private final TenantService tenantService;
+    private final OrganizationService organizationService;
 
     private final ConfigService configService;
 
@@ -64,15 +64,14 @@ public class UsagePulseServiceCEImpl implements UsagePulseServiceCE {
         usagePulse.setViewMode(usagePulseDTO.getViewMode());
 
         Mono<User> currentUserMono = sessionUserService.getCurrentUser();
-        // TODO: Change to getCurrentTenantId once multi-tenancy in introduced
-        Mono<String> tenantIdMono = tenantService.getDefaultTenantId();
+        Mono<String> organizationIdMono = organizationService.getCurrentUserOrganizationId();
         Mono<String> instanceIdMono = configService.getInstanceId();
 
-        return Mono.zip(currentUserMono, tenantIdMono, instanceIdMono).flatMap(tuple -> {
+        return Mono.zip(currentUserMono, organizationIdMono, instanceIdMono).flatMap(tuple -> {
             User user = tuple.getT1();
-            String tenantId = tuple.getT2();
+            String organizationId = tuple.getT2();
             String instanceId = tuple.getT3();
-            usagePulse.setTenantId(tenantId);
+            usagePulse.setOrganizationId(organizationId);
             usagePulse.setInstanceId(instanceId);
 
             if (user.isAnonymous()) {

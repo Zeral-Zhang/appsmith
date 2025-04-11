@@ -93,7 +93,6 @@ public class DatasourceServiceCEImpl implements DatasourceServiceCE {
     private final RateLimitService rateLimitService;
     private final FeatureFlagService featureFlagService;
     private final ObservationRegistry observationRegistry;
-
     // Defines blocking duration for test as well as connection created for query execution
     // This will block the creation of datasource connection for 5 minutes, in case of more than 3 failed connection
     // attempts
@@ -142,7 +141,9 @@ public class DatasourceServiceCEImpl implements DatasourceServiceCE {
 
     @Override
     public Mono<Datasource> create(Datasource datasource) {
-        return createEx(datasource, workspacePermission.getDatasourceCreatePermission(), false, null);
+        return workspacePermission
+                .getDatasourceCreatePermission()
+                .flatMap(permission -> createEx(datasource, permission, false, null));
     }
 
     // TODO: Check usage
@@ -636,8 +637,24 @@ public class DatasourceServiceCEImpl implements DatasourceServiceCE {
                 .switchIfEmpty(Mono.error(new AppsmithException(
                         AppsmithError.NO_RESOURCE_FOUND, FieldName.PLUGIN, datasourceStorage.getPluginId())));
 
-        return pluginExecutorMono.flatMap(pluginExecutor -> ((PluginExecutor<Object>) pluginExecutor)
-                .testDatasource(datasourceStorage.getDatasourceConfiguration()));
+        // Feature flagging implementation is added here as a potential fix to dynamoDB query timeouts problem
+        // This is a temporary fix and will be removed once we get the confirmation from the user that issue is resolved
+        // Even if the issue is not resolved, we will know that fix does not work and hence will be removing the code in
+        // any case
+        // https://github.com/appsmithorg/appsmith/issues/39426 Created task here to remove this flag
+        // This implementation ensures that none of the existing plugins have any impact due to feature flagging, hence
+        // if else condition
+        return featureFlagService
+                .check(FeatureFlagEnum.release_dynamodb_connection_time_to_live_enabled)
+                .flatMap(isDynamoDBConnectionTimeToLiveEnabled -> {
+                    if (isDynamoDBConnectionTimeToLiveEnabled) {
+                        return pluginExecutorMono.flatMap(pluginExecutor -> ((PluginExecutor<Object>) pluginExecutor)
+                                .testDatasource(datasourceStorage.getDatasourceConfiguration(), true));
+                    } else {
+                        return pluginExecutorMono.flatMap(pluginExecutor -> ((PluginExecutor<Object>) pluginExecutor)
+                                .testDatasource(datasourceStorage.getDatasourceConfiguration()));
+                    }
+                });
     }
 
     /*
@@ -839,8 +856,9 @@ public class DatasourceServiceCEImpl implements DatasourceServiceCE {
 
     @Override
     public Mono<Datasource> archiveById(String id) {
-        return repository
-                .findById(id, datasourcePermission.getDeletePermission())
+        return datasourcePermission
+                .getDeletePermission()
+                .flatMap(permission -> repository.findById(id, permission))
                 .switchIfEmpty(
                         Mono.error(new AppsmithException(AppsmithError.NO_RESOURCE_FOUND, FieldName.DATASOURCE, id)))
                 .zipWhen(datasource -> newActionRepository.countByDatasourceId(datasource.getId()))

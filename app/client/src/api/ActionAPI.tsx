@@ -9,6 +9,7 @@ import type { Action, ActionViewMode } from "entities/Action";
 import type { APIRequest } from "constants/AppsmithActionConstants/ActionConstants";
 import type { WidgetType } from "constants/WidgetConstants";
 import type { ActionParentEntityTypeInterface } from "ee/entities/Engine/actionHelpers";
+import type { PostActionRunConfig } from "./types";
 
 export interface Property {
   key: string;
@@ -86,6 +87,7 @@ export interface ActionResponse {
   readableError?: string;
   responseDisplayFormat?: string;
   pluginErrorDetails?: PluginErrorDetails;
+  postRunAction?: PostActionRunConfig;
 }
 
 //This contains the error details from the plugin that is sent to the client in the response
@@ -158,6 +160,49 @@ class ActionAPI extends API {
     applicationId: string,
   ): Promise<AxiosPromise<ApiResponse<ActionViewMode[]>>> {
     return API.get(`${ActionAPI.url}/view`, { applicationId });
+  }
+
+  static async generateVisualization(
+    actionId: string,
+    prompt: string,
+    data: unknown,
+  ): Promise<
+    AxiosPromise<{
+      result: { html: string; css: string; js: string; error: string };
+    }>
+  > {
+    return API.post(
+      `${ActionAPI.url}/${actionId}/visualize`,
+      {
+        prompt,
+        data,
+      },
+      {},
+      {
+        timeout: 60000, // 1 minute
+      },
+    );
+  }
+
+  static async saveVisualization(
+    actionId: string,
+    elements: {
+      html: string;
+      css: string;
+      js: string;
+    },
+  ): Promise<
+    AxiosPromise<
+      ApiResponse<{
+        result: { html: string; css: string; js: string; error: string };
+      }>
+    >
+  > {
+    return API.patch(`${ActionAPI.url}/${actionId}/visualize`, {
+      existing: {
+        result: elements,
+      },
+    });
   }
 
   static async fetchActionsByPageId(

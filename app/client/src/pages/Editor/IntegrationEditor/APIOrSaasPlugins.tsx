@@ -38,6 +38,7 @@ import {
   CREATE_NEW_DATASOURCE_REST_API,
   CREATE_NEW_SAAS_SECTION_HEADER,
   createMessage,
+  UPCOMING_SAAS_INTEGRATIONS,
 } from "ee/constants/messages";
 import scrollIntoView from "scroll-into-view-if-needed";
 import PremiumDatasources from "./PremiumDatasources";
@@ -48,7 +49,7 @@ import {
 } from "./PremiumDatasources/Constants";
 import { getDatasourcesLoadingState } from "selectors/datasourceSelectors";
 import { getIDETypeByUrl } from "ee/entities/IDE/utils";
-import type { IDEType } from "ee/entities/IDE/constants";
+import type { IDEType } from "ee/IDE/Interfaces/IDETypes";
 import { filterSearch } from "./util";
 import { selectFeatureFlagCheck } from "ee/selectors/featureFlagsSelectors";
 import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
@@ -78,6 +79,7 @@ interface CreateAPIOrSaasPluginsProps {
   authApiPlugin?: Plugin;
   restAPIVisible?: boolean;
   graphQLAPIVisible?: boolean;
+  isIntegrationsEnabledForPaid?: boolean;
 }
 
 export const API_ACTION = {
@@ -232,7 +234,9 @@ function APIOrSaasPlugins(props: CreateAPIOrSaasPluginsProps) {
           rightSibling={isCreating && <Spinner className="cta" size={"sm"} />}
         />
       ))}
-      <PremiumDatasources plugins={props.premiumPlugins} />
+      {!props.isIntegrationsEnabledForPaid && (
+        <PremiumDatasources plugins={props.premiumPlugins} />
+      )}
     </DatasourceContainer>
   );
 }
@@ -277,6 +281,19 @@ function CreateAPIOrSaasPlugins(props: CreateAPIOrSaasPluginsProps) {
         </DatasourceSectionHeading>
         <APIOrSaasPlugins {...props} />
       </DatasourceSection>
+      {props.premiumPlugins.length > 0 && props.isIntegrationsEnabledForPaid ? (
+        <DatasourceSection id="upcoming-saas-integrations">
+          <DatasourceSectionHeading kind="heading-m">
+            {createMessage(UPCOMING_SAAS_INTEGRATIONS)}
+          </DatasourceSectionHeading>
+          <DatasourceContainer data-testid="upcoming-datasource-card-container">
+            <PremiumDatasources
+              isIntegrationsEnabledForPaid
+              plugins={props.premiumPlugins}
+            />
+          </DatasourceContainer>
+        </DatasourceSection>
+      ) : null}
     </>
   );
 }
@@ -328,10 +345,22 @@ const mapStateToProps = (
     FEATURE_FLAG.release_external_saas_plugins_enabled,
   );
 
+  const isIntegrationsEnabledForPaid = selectFeatureFlagCheck(
+    state,
+    FEATURE_FLAG.license_external_saas_plugins_enabled,
+  );
+
+  const pluginNames = allPlugins.map((plugin) =>
+    plugin.name.toLocaleLowerCase(),
+  );
+
   const premiumPlugins =
     props.showSaasAPIs && props.isPremiumDatasourcesViewEnabled
       ? (filterSearch(
-          getFilteredPremiumIntegrations(isExternalSaasEnabled),
+          getFilteredPremiumIntegrations(
+            isExternalSaasEnabled || isIntegrationsEnabledForPaid,
+            pluginNames,
+          ),
           searchedPlugin,
         ) as PremiumIntegration[])
       : [];
@@ -356,6 +385,7 @@ const mapStateToProps = (
     restAPIVisible,
     graphQLAPIVisible,
     isCreating: props.isCreating || getDatasourcesLoadingState(state),
+    isIntegrationsEnabledForPaid,
   };
 };
 

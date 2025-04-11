@@ -3,6 +3,7 @@ package com.appsmith.server.solutions;
 import com.appsmith.server.configurations.CommonConfig;
 import com.appsmith.server.configurations.EmailConfig;
 import com.appsmith.server.configurations.GoogleRecaptchaConfig;
+import com.appsmith.server.helpers.BlacklistedEnvVariableHelper;
 import com.appsmith.server.helpers.FileUtils;
 import com.appsmith.server.helpers.UserUtils;
 import com.appsmith.server.notifications.EmailSender;
@@ -10,9 +11,9 @@ import com.appsmith.server.repositories.UserRepository;
 import com.appsmith.server.services.AnalyticsService;
 import com.appsmith.server.services.ConfigService;
 import com.appsmith.server.services.EmailService;
+import com.appsmith.server.services.OrganizationService;
 import com.appsmith.server.services.PermissionGroupService;
 import com.appsmith.server.services.SessionUserService;
-import com.appsmith.server.services.TenantService;
 import com.appsmith.server.services.UserService;
 import com.appsmith.server.solutions.ce.EnvManagerCEImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,9 +39,10 @@ public class EnvManagerImpl extends EnvManagerCEImpl implements EnvManager {
             PermissionGroupService permissionGroupService,
             ConfigService configService,
             UserUtils userUtils,
-            TenantService tenantService,
+            OrganizationService organizationService,
             ObjectMapper objectMapper,
-            EmailService emailService) {
+            EmailService emailService,
+            BlacklistedEnvVariableHelper blacklistedEnvVariableHelper) {
 
         super(
                 sessionUserService,
@@ -56,8 +58,9 @@ public class EnvManagerImpl extends EnvManagerCEImpl implements EnvManager {
                 permissionGroupService,
                 configService,
                 userUtils,
-                tenantService,
+                organizationService,
                 objectMapper,
-                emailService);
+                emailService,
+                blacklistedEnvVariableHelper);
     }
 }

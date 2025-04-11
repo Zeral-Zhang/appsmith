@@ -18,7 +18,6 @@ const _Sidebar = (props: SidebarProps, ref: Ref<HTMLDivElement>) => {
     onEntered: onEnteredProp,
     onExit: onExitProp,
     onExited: onExitedProp,
-    title,
     variant = "sidebar",
     ...rest
   } = props;
@@ -47,7 +46,7 @@ const _Sidebar = (props: SidebarProps, ref: Ref<HTMLDivElement>) => {
   };
 
   const content = (
-    <SidebarContent title={title}>
+    <SidebarContent>
       {typeof children === "function"
         ? children({ isAnimating, state })
         : children}

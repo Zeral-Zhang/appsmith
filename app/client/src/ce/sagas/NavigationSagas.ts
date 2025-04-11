@@ -21,8 +21,8 @@ import { flushErrors } from "actions/errorActions";
 import type { NavigationMethod } from "utils/history";
 import UsagePulse from "usagePulse";
 import { getIDETypeByUrl } from "ee/entities/IDE/utils";
-import type { EditorViewMode } from "ee/entities/IDE/constants";
-import { IDE_TYPE } from "ee/entities/IDE/constants";
+import type { EditorViewMode } from "IDE/Interfaces/EditorTypes";
+import { IDE_TYPE } from "ee/IDE/Interfaces/IDETypes";
 import { updateIDETabsOnRouteChangeSaga } from "sagas/IDESaga";
 import { getIDEViewMode } from "selectors/ideSelectors";
 
@@ -137,7 +137,7 @@ function* logNavigationAnalytics(payload: RouteChangeActionPayload) {
   });
 }
 
-function* setSelectedWidgetsSaga(invokedBy?: NavigationMethod) {
+export function* setSelectedWidgetsSaga(invokedBy?: NavigationMethod) {
   const pathname = window.location.pathname;
   const entityInfo = identifyEntityFromPath(pathname);
   let widgets: string[] = [];

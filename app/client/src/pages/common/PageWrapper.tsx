@@ -8,7 +8,7 @@ import {
 } from "ee/utils/BusinessFeatures/brandingPageHelpers";
 import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
 import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
-import { getTenantConfig } from "ee/selectors/tenantSelectors";
+import { getOrganizationConfig } from "ee/selectors/organizationSelectors";
 import { useSelector } from "react-redux";
 
 export const Wrapper = styled.section<{ isFixed?: boolean }>`
@@ -41,10 +41,7 @@ export const Wrapper = styled.section<{ isFixed?: boolean }>`
 `;
 
 export const PageBody = styled.div<{ isSavable?: boolean }>`
-  height: calc(
-    100vh - ${(props) => props.theme.homePage.header}px -
-      ${(props) => (props.isSavable ? "84px" : "0px")}
-  );
+  height: calc(100vh - ${(props) => props.theme.homePage.header}px);
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -68,8 +65,8 @@ export function PageWrapper(props: PageWrapperProps) {
   const isBrandingEnabled = useFeatureFlag(
     FEATURE_FLAG?.license_branding_enabled,
   );
-  const tentantConfig = useSelector(getTenantConfig);
-  const { instanceName } = tentantConfig;
+  const organizationConfig = useSelector(getOrganizationConfig);
+  const { instanceName } = organizationConfig;
 
   const titleSuffix = useMemo(
     () => getHTMLPageTitle(isBrandingEnabled, instanceName),

@@ -1,5 +1,5 @@
 import type { AppState } from "ee/reducers";
-import { getJSEntityItemUrl } from "ee/pages/Editor/IDE/EditorPane/JS/utils/getJSEntityItemUrl";
+import { getJSEntityItemUrl } from "ee/pages/AppIDE/layouts/routers/utils/getJSEntityItemUrl";
 import type { FocusEntityInfo } from "navigation/FocusEntity";
 import { identifyEntityFromPath } from "navigation/FocusEntity";
 import { selectJSSegmentEditorTabs } from "ee/selectors/appIDESelectors";
@@ -22,3 +22,8 @@ export const getLastJSTab = (state: AppState): FocusEntityInfo | undefined => {
     return identifyEntityFromPath(urlWithoutQueryParams);
   }
 };
+
+export const getIsJSCollectionSaving = (
+  state: AppState,
+  collectionId: string,
+) => state.ui.jsPane.isSaving[collectionId];

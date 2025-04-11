@@ -45,14 +45,16 @@ import Container from "pages/UserAuth/Container";
 import {
   getThirdPartyAuths,
   getIsFormLoginEnabled,
-  getTenantConfig,
-} from "ee/selectors/tenantSelectors";
+  getOrganizationConfig,
+} from "ee/selectors/organizationSelectors";
 import Helmet from "react-helmet";
 import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
 import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
 import { getHTMLPageTitle } from "ee/utils/BusinessFeatures/brandingPageHelpers";
 import * as Sentry from "@sentry/react";
-import { Severity } from "@sentry/react";
+import CsrfTokenInput from "pages/UserAuth/CsrfTokenInput";
+import { getSafeErrorMessage } from "ee/constants/approvedErrorMessages";
+
 const validate = (values: LoginFormValues, props: ValidateProps) => {
   const errors: LoginFormValues = {};
   const email = values[LOGIN_FORM_EMAIL_FIELD_NAME] || "";
@@ -97,8 +99,8 @@ export function Login(props: LoginFormProps) {
   const isBrandingEnabled = useFeatureFlag(
     FEATURE_FLAG.license_branding_enabled,
   );
-  const tentantConfig = useSelector(getTenantConfig);
-  const { instanceName } = tentantConfig;
+  const organizationConfig = useSelector(getOrganizationConfig);
+  const { instanceName } = organizationConfig;
   const htmlPageTitle = getHTMLPageTitle(isBrandingEnabled, instanceName);
   const invalidCredsForgotPasswordLinkText = createMessage(
     LOGIN_PAGE_INVALID_CREDS_FORGOT_PASSWORD_LINK,
@@ -115,7 +117,7 @@ export function Login(props: LoginFormProps) {
     errorMessage = queryParams.get("message") || queryParams.get("error") || "";
     showError = true;
     Sentry.captureException("Login failed", {
-      level: Severity.Error,
+      level: "error",
       extra: {
         error: new Error(errorMessage),
       },
@@ -174,7 +176,7 @@ export function Login(props: LoginFormProps) {
           }
         >
           {!!errorMessage && errorMessage !== "true"
-            ? errorMessage
+            ? getSafeErrorMessage(errorMessage)
             : createMessage(LOGIN_PAGE_INVALID_CREDS_ERROR)}
         </Callout>
       )}
@@ -184,6 +186,7 @@ export function Login(props: LoginFormProps) {
       {isFormLoginEnabled && (
         <EmailFormWrapper>
           <SpacedSubmitForm action={loginURL} method="POST">
+            <CsrfTokenInput />
             <FormGroup
               intent={error ? "danger" : "none"}
               label={createMessage(LOGIN_PAGE_EMAIL_INPUT_LABEL)}

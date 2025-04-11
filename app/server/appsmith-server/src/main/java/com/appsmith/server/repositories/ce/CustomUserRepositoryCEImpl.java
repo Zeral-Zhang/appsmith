@@ -1,12 +1,10 @@
 package com.appsmith.server.repositories.ce;
 
-import com.appsmith.server.acl.AclPermission;
 import com.appsmith.server.constants.FieldName;
 import com.appsmith.server.domains.User;
 import com.appsmith.server.exceptions.AppsmithError;
 import com.appsmith.server.exceptions.AppsmithException;
 import com.appsmith.server.helpers.ce.bridge.Bridge;
-import com.appsmith.server.helpers.ce.bridge.BridgeQuery;
 import com.appsmith.server.projections.IdOnly;
 import com.appsmith.server.repositories.BaseAppsmithRepositoryImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -20,15 +18,9 @@ import java.util.Set;
 public class CustomUserRepositoryCEImpl extends BaseAppsmithRepositoryImpl<User> implements CustomUserRepositoryCE {
 
     @Override
-    public Mono<User> findByEmail(String email, AclPermission aclPermission) {
-        BridgeQuery<User> emailCriteria = Bridge.equal(User.Fields.email, email);
-        return queryBuilder().criteria(emailCriteria).permission(aclPermission).one();
-    }
-
-    @Override
-    public Mono<User> findByEmailAndTenantId(String email, String tenantId) {
+    public Mono<User> findByEmailAndOrganizationId(String email, String organizationId) {
         return queryBuilder()
-                .criteria(Bridge.equal(User.Fields.email, email).equal(User.Fields.tenantId, tenantId))
+                .criteria(Bridge.equal(User.Fields.email, email).equal(User.Fields.organizationId, organizationId))
                 .one();
     }
 

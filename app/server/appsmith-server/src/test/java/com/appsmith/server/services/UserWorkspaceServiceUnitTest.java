@@ -118,8 +118,9 @@ public class UserWorkspaceServiceUnitTest {
             // Do not proceed with cleanup, because user context doesn't exist.
             return;
         }
-        List<Application> deletedApplications = applicationService
-                .findByWorkspaceId(workspace.getId(), applicationPermission.getDeletePermission())
+        List<Application> deletedApplications = applicationPermission
+                .getDeletePermission()
+                .flatMapMany(permission -> applicationService.findByWorkspaceId(workspace.getId(), permission))
                 .flatMap(remainingApplication -> applicationPageService.deleteApplication(remainingApplication.getId()))
                 .collectList()
                 .block();
@@ -247,12 +248,12 @@ public class UserWorkspaceServiceUnitTest {
         cleanup();
         createDummyWorkspaces().blockLast();
 
-        StepVerifier.create(userWorkspaceService.getUserWorkspacesByRecentlyUsedOrder(null))
+        StepVerifier.create(userWorkspaceService.getUserWorkspacesByRecentlyUsedOrder())
                 .assertNext(workspaces -> {
                     assertThat(workspaces).hasSize(4);
                     workspaces.forEach(workspace -> {
                         assertThat(workspaceIds.contains(workspace.getId())).isTrue();
-                        assertThat(workspace.getTenantId()).isNotEmpty();
+                        assertThat(workspace.getOrganizationId()).isNotEmpty();
                     });
                 })
                 .verifyComplete();
@@ -274,14 +275,14 @@ public class UserWorkspaceServiceUnitTest {
         userData.setRecentlyUsedEntityIds(recentlyUsedEntityDTOs);
         doReturn(Mono.just(userData)).when(userDataService).getForCurrentUser();
 
-        StepVerifier.create(userWorkspaceService.getUserWorkspacesByRecentlyUsedOrder(null))
+        StepVerifier.create(userWorkspaceService.getUserWorkspacesByRecentlyUsedOrder())
                 .assertNext(workspaces -> {
                     assertThat(workspaces).hasSize(4);
                     List<String> fetchedWorkspaceIds = new ArrayList<>();
                     workspaces.forEach(workspace -> {
                         fetchedWorkspaceIds.add(workspace.getId());
                         assertThat(workspaceIds.contains(workspace.getId())).isTrue();
-                        assertThat(workspace.getTenantId()).isNotEmpty();
+                        assertThat(workspace.getOrganizationId()).isNotEmpty();
                     });
                     assertThat(fetchedWorkspaceIds).isEqualTo(workspaceIds);
                 })

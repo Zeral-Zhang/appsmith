@@ -7,10 +7,10 @@ import com.appsmith.server.configurations.CommonConfig;
 import com.appsmith.server.configurations.WithMockAppsmithUser;
 import com.appsmith.server.constants.FieldName;
 import com.appsmith.server.domains.LoginSource;
+import com.appsmith.server.domains.Organization;
+import com.appsmith.server.domains.OrganizationConfiguration;
 import com.appsmith.server.domains.PasswordResetToken;
 import com.appsmith.server.domains.PermissionGroup;
-import com.appsmith.server.domains.Tenant;
-import com.appsmith.server.domains.TenantConfiguration;
 import com.appsmith.server.domains.User;
 import com.appsmith.server.domains.UserData;
 import com.appsmith.server.domains.UserState;
@@ -66,6 +66,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 
 @Slf4j
 @SpringBootTest
@@ -103,7 +104,7 @@ public class UserServiceTest {
     EmailVerificationTokenRepository emailVerificationTokenRepository;
 
     @Autowired
-    TenantService tenantService;
+    OrganizationService organizationService;
 
     Mono<User> userMono;
 
@@ -187,7 +188,7 @@ public class UserServiceTest {
                     assertThat(user.getId()).isNotNull();
                     assertThat(user.getEmail()).isEqualTo("new-user-email@email.com");
                     assertThat(user.getName()).isNullOrEmpty();
-                    assertThat(user.getTenantId()).isNotNull();
+                    assertThat(user.getOrganizationId()).isNotNull();
 
                     Set<Policy> userPolicies = user.getPolicies();
                     Optional<Policy> optionalManageUserPolicy = userPolicies.stream()
@@ -282,7 +283,7 @@ public class UserServiceTest {
 
         StepVerifier.create(userMono)
                 .assertNext(user -> {
-                    assertEquals(newUser.getEmail(), user.getEmail());
+                    assertEquals(newUser.getEmail().toLowerCase(), user.getEmail());
                     assertEquals(LoginSource.FORM, user.getSource());
                     assertThat(user.getIsEnabled()).isTrue();
                 })
@@ -307,7 +308,7 @@ public class UserServiceTest {
 
         StepVerifier.create(userMono)
                 .assertNext(user -> {
-                    assertEquals(newUser.getEmail(), user.getEmail());
+                    assertEquals(newUser.getEmail().toLowerCase(), user.getEmail());
                     assertEquals(LoginSource.GOOGLE, user.getSource());
                     assertTrue(user.getIsEnabled());
                 })
@@ -511,7 +512,8 @@ public class UserServiceTest {
         passwordResetToken.setFirstRequestTime(Instant.now());
 
         // mock the passwordResetTokenRepository to return request count 3 in 24 hours
-        Mockito.when(passwordResetTokenRepository.findByEmail(testEmail)).thenReturn(Mono.just(passwordResetToken));
+        Mockito.when(passwordResetTokenRepository.findByEmailAndOrganizationId(any(), any()))
+                .thenReturn(Mono.just(passwordResetToken));
 
         ResetUserPasswordDTO resetUserPasswordDTO = new ResetUserPasswordDTO();
         resetUserPasswordDTO.setEmail("test-email-for-password-reset");
@@ -540,7 +542,8 @@ public class UserServiceTest {
     public void verifyPasswordResetToken_WhenTokenDoesNotExist_ThrowsException() {
         String testEmail = "abc@example.org";
         // mock the passwordResetTokenRepository to return empty
-        Mockito.when(passwordResetTokenRepository.findByEmail(testEmail)).thenReturn(Mono.empty());
+        Mockito.when(passwordResetTokenRepository.findByEmailAndOrganizationId(any(), any()))
+                .thenReturn(Mono.empty());
 
         StepVerifier.create(userService.verifyPasswordResetToken(getEncodedToken(testEmail, "123456789")))
                 .expectErrorMessage(AppsmithError.INVALID_PASSWORD_RESET.getMessage())
@@ -553,7 +556,8 @@ public class UserServiceTest {
         passwordResetToken.setTokenHash(passwordEncoder.encode(token1));
 
         // mock the passwordResetTokenRepository to return empty
-        Mockito.when(passwordResetTokenRepository.findByEmail(testEmail)).thenReturn(Mono.just(passwordResetToken));
+        Mockito.when(passwordResetTokenRepository.findByEmailAndOrganizationId(any(), any()))
+                .thenReturn(Mono.just(passwordResetToken));
 
         StepVerifier.create(userService.verifyPasswordResetToken(getEncodedToken(testEmail, token2)))
                 .expectNext(expectedResult)
@@ -584,7 +588,8 @@ public class UserServiceTest {
 
         // ** check if token is not present in DB ** //
         // mock the passwordResetTokenRepository to return empty
-        Mockito.when(passwordResetTokenRepository.findByEmail(testEmail)).thenReturn(Mono.empty());
+        Mockito.when(passwordResetTokenRepository.findByEmailAndOrganizationId(any(), any()))
+                .thenReturn(Mono.empty());
 
         StepVerifier.create(userService.resetPasswordAfterForgotPassword(token, null))
                 .expectErrorMessage(AppsmithError.INVALID_PASSWORD_RESET.getMessage())
@@ -595,7 +600,8 @@ public class UserServiceTest {
         passwordResetToken.setTokenHash(passwordEncoder.encode("abcdef"));
 
         // mock the passwordResetTokenRepository to return empty
-        Mockito.when(passwordResetTokenRepository.findByEmail(testEmail)).thenReturn(Mono.just(passwordResetToken));
+        Mockito.when(passwordResetTokenRepository.findByEmailAndOrganizationId(any(), any()))
+                .thenReturn(Mono.just(passwordResetToken));
 
         StepVerifier.create(userService.resetPasswordAfterForgotPassword(token, null))
                 .expectErrorMessage(AppsmithError.GENERIC_BAD_REQUEST.getMessage(FieldName.TOKEN))
@@ -659,56 +665,65 @@ public class UserServiceTest {
     }
 
     @Test
+    @WithUserDetails("api_user")
     public void emailVerificationTokenGenerate_WhenInstanceEmailVerificationIsNotEnabled_ThrowsException() {
         String testEmail = "test-email-for-verification";
 
+        Mono<Organization> currentUserOrganizationMono =
+                organizationService.getCurrentUserOrganization().cache();
         // create user
         User newUser = new User();
         newUser.setEmail(testEmail);
-        Mono<User> userMono = userRepository.save(newUser);
+        Mono<User> userMono = currentUserOrganizationMono.flatMap(organization -> {
+            newUser.setOrganizationId(organization.getId());
+            return userRepository.save(newUser);
+        });
 
-        // Setting tenant Config emailVerificationEnabled to FALSE
-        Mono<Tenant> tenantMono = tenantService.getDefaultTenant().flatMap(tenant1 -> {
-            TenantConfiguration tenantConfiguration = tenant1.getTenantConfiguration();
-            tenantConfiguration.setEmailVerificationEnabled(Boolean.FALSE);
-            tenant1.setTenantConfiguration(tenantConfiguration);
-            return tenantService.update(tenant1.getId(), tenant1);
+        // Setting Organization Config emailVerificationEnabled to FALSE
+        Mono<Organization> organizationMono = currentUserOrganizationMono.flatMap(organization -> {
+            OrganizationConfiguration organizationConfiguration = organization.getOrganizationConfiguration();
+            organizationConfiguration.setEmailVerificationEnabled(Boolean.FALSE);
+            organization.setOrganizationConfiguration(organizationConfiguration);
+            return organizationService.update(organization.getId(), organization);
         });
 
         Mono<Boolean> emailVerificationMono =
                 userService.resendEmailVerification(getResendEmailVerificationDTO(testEmail), null);
 
-        Mono<Boolean> resultMono = userMono.then(tenantMono).then(emailVerificationMono);
+        Mono<Boolean> resultMono = userMono.then(organizationMono).then(emailVerificationMono);
 
         StepVerifier.create(resultMono)
-                .expectErrorMessage(AppsmithError.TENANT_EMAIL_VERIFICATION_NOT_ENABLED.getMessage())
+                .expectErrorMessage(AppsmithError.EMAIL_VERIFICATION_NOT_ENABLED.getMessage())
                 .verify();
     }
 
     @Test
+    @WithUserDetails("api_user")
     public void emailVerificationTokenGenerate_WhenUserEmailAlreadyVerified_ThrowsException() {
         String testEmail = "test-email-for-verification-user-already-verified";
 
-        // create user
+        // Get current organization first
+        Organization organization =
+                organizationService.getCurrentUserOrganization().block();
+
+        // create user with organization ID
         User newUser = new User();
         newUser.setEmail(testEmail);
         newUser.setEmailVerified(Boolean.TRUE);
-        Mono<User> userMono = userRepository.save(newUser);
+        newUser.setOrganizationId(organization.getId());
+        userRepository.save(newUser).block();
 
-        // Setting tenant Config emailVerificationEnabled to TRUE
-        Mono<Tenant> tenantMono = tenantService.getDefaultTenant().flatMap(tenant1 -> {
-            TenantConfiguration tenantConfiguration = tenant1.getTenantConfiguration();
-            tenantConfiguration.setEmailVerificationEnabled(Boolean.TRUE);
-            tenant1.setTenantConfiguration(tenantConfiguration);
-            return tenantService.update(tenant1.getId(), tenant1);
-        });
+        // Setting Organization Config emailVerificationEnabled to TRUE
+
+        OrganizationConfiguration organizationConfiguration = organization.getOrganizationConfiguration();
+        organizationConfiguration.setEmailVerificationEnabled(Boolean.TRUE);
+        organization.setOrganizationConfiguration(organizationConfiguration);
+        organizationService.update(organization.getId(), organization).block();
 
         Mono<Boolean> emailVerificationMono =
                 userService.resendEmailVerification(getResendEmailVerificationDTO(testEmail), null);
 
-        Mono<Boolean> resultMono = userMono.then(tenantMono).then(emailVerificationMono);
-
-        StepVerifier.create(resultMono)
+        StepVerifier.create(emailVerificationMono)
                 .expectErrorMessage(AppsmithError.USER_ALREADY_VERIFIED.getMessage())
                 .verify();
     }

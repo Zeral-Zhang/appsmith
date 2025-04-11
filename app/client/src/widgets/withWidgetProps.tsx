@@ -37,7 +37,7 @@ import type { WidgetEntityConfig } from "ee/entities/DataTree/types";
 import { Positioning } from "layoutSystems/common/utils/constants";
 import { isAutoHeightEnabledForWidget } from "./WidgetUtils";
 import { CANVAS_DEFAULT_MIN_HEIGHT_PX } from "constants/AppConstants";
-import { getGoogleMapsApiKey } from "ee/selectors/tenantSelectors";
+import { getGoogleMapsApiKey } from "ee/selectors/organizationSelectors";
 import ConfigTreeActions from "utils/configTree";
 import { getSelectedWidgetAncestry } from "../selectors/widgetSelectors";
 import { getWidgetMinMaxDimensionsInPixel } from "layoutSystems/autolayout/utils/flexWidgetUtils";
@@ -95,7 +95,20 @@ function withWidgetProps(WrappedWidget: typeof BaseWidget) {
     );
 
     const metaWidgetChildrenStructure = useSelector(
-      getMetaWidgetChildrenStructure(widgetId, type, hasMetaWidgets),
+      getMetaWidgetChildrenStructure(
+        widgetId,
+        type,
+        /**
+         * With UI modules there is a possiblity of the module to have modals
+         * These modals would be meta widgets and would be added to the metaWidgetsReducer.
+         * These modals needs to be placed in the children of the main container widget.
+         * The main container widget by default does not has the flag hasMetaWidgets set to true.
+         * So we need to check for the widgetId to be the main container widgetId.
+         *
+         * TODO (Ashit) - Make the hasMetaWidgets flag to be set to true for the main container widget and avoid specific check for the widgetId.
+         */
+        hasMetaWidgets || widgetId === MAIN_CONTAINER_WIDGET_ID,
+      ),
       equal,
     );
 

@@ -19,6 +19,7 @@ import com.appsmith.external.views.FromRequest;
 import com.appsmith.external.views.Git;
 import com.appsmith.external.views.Views;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonView;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -347,5 +348,19 @@ public class ActionCE_DTO implements Identifiable, Executable {
         return this.getPageId();
     }
 
+    public void setContextId(String contextId) {
+        this.pageId = contextId;
+    }
+
     public static class Fields {}
+
+    @JsonIgnore
+    public String getArtifactId() {
+        return this.getApplicationId();
+    }
+
+    @JsonIgnore
+    public String getContextId() {
+        return this.getPageId();
+    }
 }

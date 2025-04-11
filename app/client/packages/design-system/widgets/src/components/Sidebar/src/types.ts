@@ -35,5 +35,4 @@ export interface SidebarProps {
         state: SidebarState;
       }) => React.ReactNode);
   className?: string;
-  title?: string;
 }

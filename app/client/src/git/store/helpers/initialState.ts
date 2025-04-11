@@ -13,6 +13,7 @@ import type {
 const gitArtifactInitialUIState: GitArtifactUIReduxState = {
   initializing: false,
   initialized: false,
+  currentBranch: null,
   connectModalOpen: false,
   connectSuccessModalOpen: false,
   disconnectBaseArtifactId: null,
@@ -128,6 +129,16 @@ const gitArtifactInitialAPIResponses: GitArtifactAPIResponsesReduxState = {
     loading: false,
     error: null,
   },
+  pretag: {
+    value: null,
+    loading: false,
+    error: null,
+  },
+  createReleaseTag: {
+    loading: false,
+    error: null,
+  },
+
   // EE
   ...gitArtifactAPIResponsesInitialStateExtended,
 };

@@ -266,8 +266,9 @@ public class CommonGitServiceCETest {
     @AfterEach
     public void cleanup() {
         Mockito.when(commonGitFileUtils.deleteLocalRepo(any(Path.class))).thenReturn(Mono.just(true));
-        List<Application> deletedApplications = applicationService
-                .findByWorkspaceId(workspaceId, applicationPermission.getDeletePermission())
+        List<Application> deletedApplications = applicationPermission
+                .getDeletePermission()
+                .flatMapMany(permission -> applicationService.findByWorkspaceId(workspaceId, permission))
                 .flatMap(remainingApplication -> applicationPageService.deleteApplication(remainingApplication.getId()))
                 .collectList()
                 .block();
@@ -1607,7 +1608,7 @@ public class CommonGitServiceCETest {
                         Mockito.anyString(),
                         Mockito.anyBoolean()))
                 .thenReturn(Mono.just("fetched"));
-        Mockito.when(gitExecutor.resetToLastCommit(any(Path.class), Mockito.anyString()))
+        Mockito.when(gitExecutor.resetToLastCommit(any(Path.class), Mockito.anyString(), Mockito.anyBoolean()))
                 .thenReturn(Mono.just(true));
 
         Mono<GitPullDTO> applicationMono =
@@ -1703,7 +1704,7 @@ public class CommonGitServiceCETest {
                         Mockito.anyString(),
                         Mockito.anyString()))
                 .thenReturn(Mono.just(mergeStatusDTO));
-        Mockito.when(gitExecutor.resetToLastCommit(any(Path.class), Mockito.anyString()))
+        Mockito.when(gitExecutor.resetToLastCommit(any(Path.class), Mockito.anyString(), Mockito.anyBoolean()))
                 .thenReturn(Mono.just(true));
 
         Mono<GitPullDTO> applicationMono =
@@ -1753,7 +1754,7 @@ public class CommonGitServiceCETest {
                         Mockito.anyString(),
                         Mockito.anyString()))
                 .thenReturn(Mono.just("fetchResult"));
-        Mockito.when(gitExecutor.resetToLastCommit(any(Path.class), Mockito.anyString()))
+        Mockito.when(gitExecutor.resetToLastCommit(any(Path.class), Mockito.anyString(), Mockito.anyBoolean()))
                 .thenReturn(Mono.just(TRUE));
         Mockito.when(commonGitFileUtils.saveArtifactToLocalRepoWithAnalytics(
                         any(Path.class), any(), Mockito.anyString()))
@@ -1797,7 +1798,7 @@ public class CommonGitServiceCETest {
                         Mockito.anyString(),
                         Mockito.anyString()))
                 .thenReturn(Mono.just("fetchResult"));
-        Mockito.when(gitExecutor.resetToLastCommit(any(Path.class), Mockito.anyString()))
+        Mockito.when(gitExecutor.resetToLastCommit(any(Path.class), Mockito.anyString(), Mockito.anyBoolean()))
                 .thenReturn(Mono.just(Boolean.FALSE));
         Mockito.when(commonGitFileUtils.saveArtifactToLocalRepoWithAnalytics(
                         any(Path.class), any(), Mockito.anyString()))
@@ -1847,7 +1848,7 @@ public class CommonGitServiceCETest {
                         Mockito.anyString(),
                         Mockito.anyString()))
                 .thenReturn(Mono.just("fetchResult"));
-        Mockito.when(gitExecutor.resetToLastCommit(any(Path.class), Mockito.anyString()))
+        Mockito.when(gitExecutor.resetToLastCommit(any(Path.class), Mockito.anyString(), Mockito.anyBoolean()))
                 .thenReturn(Mono.just(Boolean.FALSE));
         Mockito.when(commonGitFileUtils.saveArtifactToLocalRepoWithAnalytics(
                         any(Path.class), any(), Mockito.anyString()))
